@@ -5,37 +5,77 @@
 #include <stdbool.h>
 #include "stm32f446xx.h"
 
+// GPIO object
 typedef struct {
-    GPIO_TypeDef *port;
-    uint16_t pin;
+    GPIO_TypeDef *port;   // ports: A, B, C
+    uint16_t pin;         // 0..15 (bit index)
 } gpio_t;
 
-// Interrupt types
+// Pin modes
 typedef enum {
-    EDGE_RISING,
-    EDGE_FALLING,
-    EDGE_BOTH
+    GPIO_MODE_INPUT_t  = 0x00,
+    GPIO_MODE_OUTPUT_t = 0x01,
+    GPIO_MODE_AF_t     = 0x02,
+    GPIO_MODE_ANALOG_t = 0x03
+} gpio_mode_t;
+
+// Pull modes
+typedef enum {
+    GPIO_PULL_NONE_t = 0x00,
+    GPIO_PULL_UP_t   = 0x01,
+    GPIO_PULL_DOWN_t = 0x02
+} gpio_pull_t;
+
+// OTYPER (Output Type Register)
+typedef enum {
+    GPIO_OTYPE_PP_t = 0x00,  // Push-pull
+    GPIO_OTYPE_OD_t = 0x01   // Open-drain
+} gpio_otype_t;
+
+// OSPEEDR
+typedef enum {
+    GPIO_SPEED_LOW_t       = 0x00,
+    GPIO_SPEED_MEDIUM_t    = 0x01,
+    GPIO_SPEED_HIGH_t      = 0x02,
+    GPIO_SPEED_VERY_HIGH_t = 0x03
+} gpio_speed_t;
+
+// Interrupt edges types
+typedef enum {
+    EDGE_RISING_t,
+    EDGE_FALLING_t,
+    EDGE_BOTH_t
 } edge_type_t;
 
-// Pull types
-typedef enum {
-    GPIO_NO_PULL = 0,
-    GPIO_PULL_UP,
-    GPIO_PULL_DOWN
-} gpio_pull_t;
 
 
 // GPIO INIT
-void gpio_init_input(gpio_t pin, gpio_pull_t pull);
-void gpio_init_output(gpio_t pin, bool push_pull);
-// Work with GPIO
-void gpio_write(gpio_t pin, bool value);
-void gpio_read(gpio_t pin);
-// Toggle
-void gpio_toggle(gpio_t pin);
-// Callbacks
-typedef void (*gpio_callback_t)(gpio_t pin);
-void gpio_set_callback(gpio_t pin, gpio_callback_t cb);
-// Interrupt subsystem
-void gpio_attach_interrupt(gpio_t pin, edge_type_t edge);
+//
+// Universal pin init function
+void gpio_init(gpio_t gpio, gpio_mode_t mode, gpio_pull_t pull, gpio_otype_t otype, gpio_speed_t speed);
+// Simplified setup of a pin as an input.
+void gpio_init_input(gpio_t gpio, gpio_pull_t pull);
+// Simplified setup of a pin as an output. 
+void gpio_init_output(gpio_t gpio, bool push_pull);
+// Set alternate function
+void gpio_set_alternate_function(gpio_t gpio, uint8_t af_num);
+
+// Operations
+//
+// Writes a logic level to a pin. The point is to set the exit state.
+void gpio_write(gpio_t gpio, uint8_t state);
+// Inverts the current state of the output. The point is to switch the pin without knowing the current state from the outside.
+void gpio_toggle(gpio_t gpio);
+// Reads the current logic level. The point is to get the actual state of the line.
+uint8_t gpio_read(gpio_t gpio);
+
+// Fast opetations
+//
+// Sets the pin to 1. The point is to quickly enable the PIN
+static inline void gpio_set(gpio_t gpio); 
+// Resets the pin to 0. The point is to quickly turn off the pin
+static inline void gpio_reset(gpio_t gpio);
+// A faster analogue of gpio_write. The point: write without unnecessary logic
+static inline void gpio_write_fast(gpio_t gpio, uint8_t state);
+
 #endif
