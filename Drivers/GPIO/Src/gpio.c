@@ -1,26 +1,19 @@
 #include "gpio.h"
 #include <stdint.h>
 #include <stdbool.h>
-#include "main.h"
 #include "stm32f446xx.h"
 #include <assert.h>
 
 
 static void gpio_enable_clock(GPIO_TypeDef *port) {
-    if(port == GPIOA) 
-        RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
-    else if(port == GPIOB)
-        RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
-    else if(port == GPIOC)
-        RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
-    else if(port == GPIOD)
-        RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN;
-    else if(port == GPIOH)
-        RCC->AHB1ENR |= RCC_AHB1ENR_GPIOHEN;
+    if(port == GPIOA)      RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+    else if(port == GPIOB) RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
+    else if(port == GPIOC) RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
+    else if(port == GPIOD) RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN;
+    else if(port == GPIOH) RCC->AHB1ENR |= RCC_AHB1ENR_GPIOHEN;
 }
 
 void gpio_init(gpio_t gpio, gpio_mode_t mode, gpio_pull_t pull, gpio_otype_t otype, gpio_speed_t speed) {
-    // TODO AF function
     assert(gpio.pin <= 15);
     assert(gpio.port != NULL);
     // RCC
@@ -33,7 +26,7 @@ void gpio_init(gpio_t gpio, gpio_mode_t mode, gpio_pull_t pull, gpio_otype_t oty
     gpio.port->PUPDR &= ~(3U << pin_pos);
     gpio.port->PUPDR |= ((uint32_t)pull << pin_pos);
     // Output type (requiered 1 bit)
-    gpio.port->OTYPER &= ~(3U << pin_pos);
+    gpio.port->OTYPER &= ~(1U << gpio.pin);
     gpio.port->OTYPER |= ((uint32_t)otype << gpio.pin);
     // Output speed
     gpio.port->OSPEEDR &= ~(3U << pin_pos);
@@ -43,6 +36,9 @@ void gpio_init(gpio_t gpio, gpio_mode_t mode, gpio_pull_t pull, gpio_otype_t oty
 void gpio_init_input(gpio_t gpio, gpio_pull_t pull) {
     assert(gpio.pin <= 15);
     assert(gpio.port != NULL);
+    // RCC
+    gpio_enable_clock(gpio.port);
+    uint32_t pin_pos = gpio.pin * 2U;
     // Mode: Input (00)
     gpio.port->MODER &= ~(3U << pin_pos);
     // Pull
@@ -53,6 +49,9 @@ void gpio_init_input(gpio_t gpio, gpio_pull_t pull) {
 void gpio_init_output(gpio_t gpio, bool push_pull) {
     assert(gpio.pin <= 15);
     assert(gpio.port != NULL);
+    // RCC
+    gpio_enable_clock(gpio.port);
+    uint32_t pin_pos = gpio.pin * 2U;
     // Mode: Output (01)
     gpio.port->MODER &= ~(3U << pin_pos);
     gpio.port->MODER |= (1U << pin_pos);

@@ -1,6 +1,7 @@
 #ifndef GPIO_H_
 #define GPIO_H_
 
+#include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include "stm32f446xx.h"
@@ -47,8 +48,6 @@ typedef enum {
     EDGE_BOTH_t
 } edge_type_t;
 
-
-
 // GPIO INIT
 //
 // Universal pin init function
@@ -60,22 +59,32 @@ void gpio_init_output(gpio_t gpio, bool push_pull);
 // Set alternate function
 void gpio_set_alternate_function(gpio_t gpio, uint8_t af_num);
 
-// Operations
-//
-// Writes a logic level to a pin. The point is to set the exit state.
-void gpio_write(gpio_t gpio, uint8_t state);
-// Inverts the current state of the output. The point is to switch the pin without knowing the current state from the outside.
-void gpio_toggle(gpio_t gpio);
-// Reads the current logic level. The point is to get the actual state of the line.
-uint8_t gpio_read(gpio_t gpio);
 
 // Fast opetations
 //
+// Writes a logic level to a pin. The point is to set the exit state.
+static inline void gpio_write(gpio_t gpio, uint8_t state) {
+    if(state) {
+        gpio.port->BSRR = (1U << gpio.pin);
+    } else {
+        gpio.port->BSRR = (1U << (gpio.pin + 16U));
+    }
+}
+// Reads the current logic level. The point is to get the actual state of the line.
+static inline uint8_t gpio_read(gpio_t gpio) {
+    return (gpio.port->IDR & (1U << gpio.pin)) ? 1 : 0;
+}
 // Sets the pin to 1. The point is to quickly enable the PIN
-static inline void gpio_set(gpio_t gpio); 
+static inline void gpio_set(gpio_t gpio) {
+    gpio.port->BSRR = (1U << gpio.pin);
+} 
 // Resets the pin to 0. The point is to quickly turn off the pin
-static inline void gpio_reset(gpio_t gpio);
-// A faster analogue of gpio_write. The point: write without unnecessary logic
-static inline void gpio_write_fast(gpio_t gpio, uint8_t state);
+static inline void gpio_reset(gpio_t gpio) {
+    gpio.port->BSRR = (1U << (gpio.pin + 16U));
+}
+// Inverts the current state of the output. The point is to switch the pin without knowing the current state from the outside.
+static inline void gpio_toggle(gpio_t gpio) {
+    gpio.port->ODR ^= (1U << gpio.pin);
+}
 
 #endif
