@@ -48,6 +48,9 @@ typedef enum {
     EDGE_BOTH_t
 } edge_type_t;
 
+// Callback function type
+typedef void (*gpio_callback_t)(uint16_t pin);
+
 // GPIO INIT
 //
 // Universal pin init function
@@ -58,7 +61,10 @@ void gpio_init_input(gpio_t gpio, gpio_pull_t pull);
 void gpio_init_output(gpio_t gpio, bool push_pull);
 // Set alternate function
 void gpio_set_alternate_function(gpio_t gpio, uint8_t af_num);
-
+// Enable interrupts
+void gpio_enable_irq(gpio_t gpio, edge_type_t edge);
+// Set callback function for interrupt
+void gpio_set_callback(uint16_t pin, gpio_callback_t callback);
 
 // Fast opetations
 //
