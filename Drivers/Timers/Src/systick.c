@@ -1,5 +1,6 @@
 #include "systick.h"
 #include <stdint.h>
+#include <assert.h>
 
 volatile uint32_t ms_ticks = 0;
 

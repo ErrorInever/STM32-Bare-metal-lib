@@ -4,17 +4,25 @@
 #include <stddef.h>
 #include <stdint.h>
 
+static timer_basic_callback_t timer_basic_callback[2] = {NULL, NULL};
 
-static void enable_clock(TIM_TypeDef instance) {
+static uint32_t get_timer_basic_index(TIM_TypeDef *instance) {
+    return (instance == TIM6) ? 0 : 1; // TIM6 0 idx, TIM7 1 idx
+}
+
+void timer_basic_set_callback(TIM_TypeDef *instance, timer_basic_callback_t callback) {
+    timer_basic_callback[get_timer_basic_index(instance)] = callback;
+}
+
+static void enable_clock(TIM_TypeDef *instance) {
     if(instance == TIM6) { RCC->APB1ENR |= RCC_APB1ENR_TIM6EN; (void)RCC->APB1ENR; }
     else if(instance == TIM7) { RCC->APB1ENR |= RCC_APB1ENR_TIM7EN; (void)RCC->APB1ENR; }
 }
 
-
 void timer_basic_init_ms(timer_basic_t timer, uint32_t period_ms) {
     // RCC
     assert(timer.instance != NULL);
-    assert(timer.bus_freq > 1U && timer.bus_freq < 184U);
+    assert(timer.bus_freq >= 1U && timer.bus_freq <= 184U);
     enable_clock(timer.instance);
     // Configure PSC and ARR
 
@@ -30,4 +38,22 @@ void timer_basic_init_ms(timer_basic_t timer, uint32_t period_ms) {
     // Enable interrupt in NVIC
     if(timer.instance == TIM6) NVIC_EnableIRQ(TIM6_DAC_IRQn);
     else if(timer.instance == TIM7) NVIC_EnableIRQ(TIM7_IRQn);
+}
+
+void TIM6_DAC_IRQHandler(void) {
+    if(TIM6->SR & TIM_SR_UIF) {
+        TIM6->SR &= ~TIM_SR_UIF; // reset flag in status register
+        if(timer_basic_callback[0]) {
+            timer_basic_callback[0]();
+        }
+    }
+}
+
+void TIM7_IRQHandler(void) {
+    if(TIM7->SR & TIM_SR_UIF) {
+        TIM7->SR &= ~TIM_SR_UIF; // reset flag in status register
+        if(timer_basic_callback[1]) {
+            timer_basic_callback[1]();
+        }
+    }
 }

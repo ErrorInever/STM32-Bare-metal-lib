@@ -1,8 +1,13 @@
 #ifndef SYSTICK_H_
 #define SYSTICK_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "stm32f446xx.h"
 #include <stdint.h>
+#include <stdbool.h>
 
 volatile uint32_t ms_ticks; // ms
 
@@ -26,5 +31,9 @@ static inline uint32_t systick_get_val(void) {
 static inline void systick_reset(void) {
     SysTick->VAL = 0UL;
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

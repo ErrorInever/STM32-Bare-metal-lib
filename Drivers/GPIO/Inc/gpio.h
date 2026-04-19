@@ -1,6 +1,11 @@
 #ifndef GPIO_H_
 #define GPIO_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -92,5 +97,9 @@ static inline void gpio_reset(gpio_t gpio) {
 static inline void gpio_toggle(gpio_t gpio) {
     gpio.port->ODR ^= (1U << gpio.pin);
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
