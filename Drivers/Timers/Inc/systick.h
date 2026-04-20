@@ -9,8 +9,6 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 
-volatile uint32_t ms_ticks; // ms
-
 // Init
 // 
 // Interrupt each ms

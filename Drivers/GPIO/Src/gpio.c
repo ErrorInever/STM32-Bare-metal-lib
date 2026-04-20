@@ -6,16 +6,21 @@
 #include <stddef.h>
 
 static gpio_callback_t gpio_callbacks[16] = {0}; // array of callback functions for each EXTI line
+static gpio_t registered_gpios[16];
 
-void gpio_set_callback(uint16_t pin, gpio_callback_t callback) {
-    if (pin < 16) gpio_callbacks[pin] = callback;
+void gpio_set_callback(gpio_t gpio, gpio_callback_t callback) {
+    uint8_t pin_idx = gpio.pin;
+    if (pin_idx < 16) {
+        gpio_callbacks[pin_idx] = callback;
+        registered_gpios[pin_idx] = gpio;
+    }
 }
 
-static void handle_gpio_interrupt(uint16_t pin) {
-    if(EXTI->PR & (1U << pin)) {
-        EXTI->PR = (1U << pin); // reset flag
-        if(gpio_callbacks[pin] != NULL) {
-            gpio_callbacks[pin](pin);
+static void handle_gpio_interrupt(uint16_t pin_idx) {
+    if(EXTI->PR & (1U << pin_idx)) {
+        EXTI->PR = (1U << pin_idx); // reset flag
+        if(gpio_callbacks[pin_idx] != NULL) {
+            gpio_callbacks[pin_idx](registered_gpios[pin_idx]);
         }
     }
 }
@@ -35,11 +40,12 @@ void EXTI15_10_IRQHandler(void) {
 
 
 static void gpio_enable_clock(GPIO_TypeDef *port) {
-    if(port == GPIOA) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN; (void)RCC->AHB1ENR; }
-    else if(port == GPIOB) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN; (void)RCC->AHB1ENR; }
-    else if(port == GPIOC) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN; (void)RCC->AHB1ENR; }
-    else if(port == GPIOD) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN; (void)RCC->AHB1ENR; }
-    else if(port == GPIOH) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOHEN; (void)RCC->AHB1ENR; }
+    if(port == GPIOA)      { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN; }
+    else if(port == GPIOB) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN; }
+    else if(port == GPIOC) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN; }
+    else if(port == GPIOD) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN; }
+    else if(port == GPIOH) { RCC->AHB1ENR |= RCC_AHB1ENR_GPIOHEN; }
+    (void)RCC->AHB1ENR; // Достаточно одного раза в конце для задержки
 }
 
 void gpio_init(gpio_t gpio, gpio_mode_t mode, gpio_pull_t pull, gpio_otype_t otype, gpio_speed_t speed) {

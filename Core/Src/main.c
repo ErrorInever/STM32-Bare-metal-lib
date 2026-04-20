@@ -1,17 +1,36 @@
 
 #include "main.h"
+#include "gpio.h"
+#include "stm32f446xx.h"
+#include "systick.h"
+#include "timer.h"
+#include <stdint.h>
 
-
+// D0 - PA3, D4 - PB5,  D9 - PC7
 
 void SystemClock_Config(void);
 
+
+
 int main(void) {
   SystemClock_Config();
+  systick_config_ms(84);
 
+  // init PA 0-7
+  for(int i = 0; i <= 7; i++) {
+    gpio_t pin = {GPIOA, i};
+    gpio_init_output(pin, true);
+  }
 
   while (1) {
+    for(int i = 0; i <= 7; i++) {
+      gpio_t pin = {GPIOA, i};
+      gpio_set(pin);
+      gpio_reset(pin);
+    }
 
   }
+
 }
 
 /**

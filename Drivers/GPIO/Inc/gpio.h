@@ -54,7 +54,7 @@ typedef enum {
 } edge_type_t;
 
 // Callback function type
-typedef void (*gpio_callback_t)(uint16_t pin);
+typedef void (*gpio_callback_t)(gpio_t gpio);
 
 // GPIO INIT
 //
@@ -69,7 +69,7 @@ void gpio_set_alternate_function(gpio_t gpio, uint8_t af_num);
 // Enable interrupts
 void gpio_enable_irq(gpio_t gpio, edge_type_t edge);
 // Set callback function for interrupt
-void gpio_set_callback(uint16_t pin, gpio_callback_t callback);
+void gpio_set_callback(gpio_t gpio, gpio_callback_t callback);
 
 // Fast opetations
 //
