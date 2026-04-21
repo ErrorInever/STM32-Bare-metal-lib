@@ -6,30 +6,52 @@
 #include "timer.h"
 #include <stdint.h>
 
-// D0 - PA3, D4 - PB5,  D9 - PC7
-
 void SystemClock_Config(void);
 
-
+// timer interrupt
+void led_toggle_handler(void *context) {
+  gpio_t *led = (gpio_t *)context;
+  gpio_toggle(led);
+}
 
 int main(void) {
   SystemClock_Config();
-  systick_config_ms(84);
+  systick_config_ms(100);
 
-  // init PA 0-7
-  for(int i = 0; i <= 7; i++) {
-    gpio_t pin = {GPIOA, i};
-    gpio_init_output(pin, true);
-  }
+  static const gpio_t b_led = {GPIOC, 0};
+  static const gpio_t r_led = {GPIOC, 1};
 
-  while (1) {
-    for(int i = 0; i <= 7; i++) {
-      gpio_t pin = {GPIOA, i};
-      gpio_set(pin);
-      gpio_reset(pin);
+  gpio_init_output(&b_led, true);
+  gpio_init_output(&r_led, true);
+
+  // setup timers
+  timer_basic_t tim6 = {TIM6, 50};
+  timer_basic_t tim7 = {TIM7, 50};
+  // init
+  timer_basic_init_ms(&tim6, 500);
+  timer_basic_init_ms(&tim7, 1000);
+  // add callbacks
+  timer_basic_set_callback(TIM6, led_toggle_handler, &b_led);
+  timer_basic_set_callback(TIM7, led_toggle_handler, &r_led);
+  // start
+  timer_basic_start(&tim6);
+  timer_basic_start(&tim7);
+
+  bool fast_mode = true;
+
+while (1) {
+    delay_ms(5000);
+    
+    if (fast_mode) {
+        timer_basic_set_period_ms(&tim6, 20);
+        timer_basic_set_period_ms(&tim7, 50);
+    } else {
+        timer_basic_set_period_ms(&tim6, 100);
+        timer_basic_set_period_ms(&tim7, 200);
     }
-
-  }
+    
+    fast_mode = !fast_mode; // Меняем режим для следующей итерации
+}
 
 }
 

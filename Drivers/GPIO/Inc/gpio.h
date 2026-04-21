@@ -54,48 +54,48 @@ typedef enum {
 } edge_type_t;
 
 // Callback function type
-typedef void (*gpio_callback_t)(gpio_t gpio);
+typedef void (*gpio_callback_t)(const gpio_t *gpio);
 
 // GPIO INIT
 //
 // Universal pin init function
-void gpio_init(gpio_t gpio, gpio_mode_t mode, gpio_pull_t pull, gpio_otype_t otype, gpio_speed_t speed);
+void gpio_init(const gpio_t *gpio, gpio_mode_t mode, gpio_pull_t pull, gpio_otype_t otype, gpio_speed_t speed);
 // Simplified setup of a pin as an input.
-void gpio_init_input(gpio_t gpio, gpio_pull_t pull);
+void gpio_init_input(const gpio_t *gpio, gpio_pull_t pull);
 // Simplified setup of a pin as an output. 
-void gpio_init_output(gpio_t gpio, bool push_pull);
+void gpio_init_output(const gpio_t *gpio, bool push_pull);
 // Set alternate function
-void gpio_set_alternate_function(gpio_t gpio, uint8_t af_num);
+void gpio_set_alternate_function(const gpio_t *gpio, uint8_t af_num);
 // Enable interrupts
-void gpio_enable_irq(gpio_t gpio, edge_type_t edge);
+void gpio_enable_irq(const gpio_t *gpio, edge_type_t edge);
 // Set callback function for interrupt
-void gpio_set_callback(gpio_t gpio, gpio_callback_t callback);
+void gpio_set_callback(const gpio_t *gpio, gpio_callback_t callback);
 
 // Fast opetations
 //
 // Writes a logic level to a pin. The point is to set the exit state.
-static inline void gpio_write(gpio_t gpio, uint8_t state) {
+static inline void gpio_write(const gpio_t *gpio, uint8_t state) {
     if(state) {
-        gpio.port->BSRR = (1U << gpio.pin);
+        gpio->port->BSRR = (1U << gpio->pin);
     } else {
-        gpio.port->BSRR = (1U << (gpio.pin + 16U));
+        gpio->port->BSRR = (1U << (gpio->pin + 16U));
     }
 }
 // Reads the current logic level. The point is to get the actual state of the line.
-static inline uint8_t gpio_read(gpio_t gpio) {
-    return (gpio.port->IDR & (1U << gpio.pin)) ? 1 : 0;
+static inline uint8_t gpio_read(const gpio_t *gpio) {
+    return (gpio->port->IDR & (1U << gpio->pin)) ? 1 : 0;
 }
 // Sets the pin to 1. The point is to quickly enable the PIN
-static inline void gpio_set(gpio_t gpio) {
-    gpio.port->BSRR = (1U << gpio.pin);
+static inline void gpio_set(const gpio_t *gpio) {
+    gpio->port->BSRR = (1U << gpio->pin);
 } 
 // Resets the pin to 0. The point is to quickly turn off the pin
-static inline void gpio_reset(gpio_t gpio) {
-    gpio.port->BSRR = (1U << (gpio.pin + 16U));
+static inline void gpio_reset(const gpio_t *gpio) {
+    gpio->port->BSRR = (1U << (gpio->pin + 16U));
 }
 // Inverts the current state of the output. The point is to switch the pin without knowing the current state from the outside.
-static inline void gpio_toggle(gpio_t gpio) {
-    gpio.port->ODR ^= (1U << gpio.pin);
+static inline void gpio_toggle(const gpio_t *gpio) {
+    gpio->port->ODR ^= (1U << gpio->pin);
 }
 
 #ifdef __cplusplus

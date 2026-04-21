@@ -10,20 +10,51 @@ extern "C" {
 #include "stm32f446xx.h"
 #include <assert.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 
 // Object Timer
 typedef struct {
     TIM_TypeDef *instance;      // TIM6 or TIM7
-    uint32_t bus_freq;     // APB1 freq Mhz
+    uint32_t bus_freq;          // APB1 freq Mhz
+    bool status;
 } timer_basic_t;
 
 // Callback
-typedef void (*timer_basic_callback_t)(void);
+typedef void (*timer_basic_callback_t)(void *context);
 // Register callback to timer
-void timer_basic_set_callback(TIM_TypeDef *instance, timer_basic_callback_t callback);
+void timer_basic_set_callback(TIM_TypeDef *instance, timer_basic_callback_t callback, void *context);
 // Init
-void timer_basic_init_ms(timer_basic_t timer, uint32_t period_ms);
+void timer_basic_init_ms(timer_basic_t *timer, uint32_t period_ms);
+// Operations
+//
+// Enable timer
+static inline void timer_basic_start(const timer_basic_t *timer) {
+    timer->instance->CR1 |= TIM_CR1_CEN;
+}
+// Disable timer
+static inline void timer_basic_stop(const timer_basic_t *timer) {
+    timer->instance->CR1 &= ~TIM_CR1_CEN;
+    timer->instance->SR &= ~TIM_SR_UIF;
+}
+// Get status
+static inline bool timer_get_status(const timer_basic_t *timer) {
+    return timer->status;
+}
+// Set one-pulse mode
+static inline void timer_basic_set_one_pulse(const timer_basic_t *timer, bool enable) {
+    if (enable) timer->instance->CR1 |= TIM_CR1_OPM;
+    else timer->instance->CR1 &= ~TIM_CR1_OPM;
+}
+// Change period_ms
+static inline void timer_basic_set_period_ms(const timer_basic_t *timer, uint32_t period_ms) {
+    timer->instance->ARR = (period_ms * 10) - 1; // Update ARR
+    timer->instance->EGR |= TIM_EGR_UG; // forced update shadow registers
+    timer->instance->SR &= ~TIM_SR_UIF;
+}
+// delay pooling
+void timer_basic_delay_ms(const timer_basic_t *timer, uint32_t ms);
+
 
 #ifdef __cplusplus
 }

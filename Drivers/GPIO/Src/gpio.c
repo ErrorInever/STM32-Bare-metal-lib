@@ -6,13 +6,13 @@
 #include <stddef.h>
 
 static gpio_callback_t gpio_callbacks[16] = {0}; // array of callback functions for each EXTI line
-static gpio_t registered_gpios[16];
+static gpio_t registered_gpios[16]; // gpio_t struct
 
-void gpio_set_callback(gpio_t gpio, gpio_callback_t callback) {
-    uint8_t pin_idx = gpio.pin;
+void gpio_set_callback(const gpio_t *gpio, gpio_callback_t callback) {
+    uint8_t pin_idx = gpio->pin;
     if (pin_idx < 16) {
         gpio_callbacks[pin_idx] = callback;
-        registered_gpios[pin_idx] = gpio;
+        registered_gpios[pin_idx] = *gpio;
     }
 }
 
@@ -20,7 +20,7 @@ static void handle_gpio_interrupt(uint16_t pin_idx) {
     if(EXTI->PR & (1U << pin_idx)) {
         EXTI->PR = (1U << pin_idx); // reset flag
         if(gpio_callbacks[pin_idx] != NULL) {
-            gpio_callbacks[pin_idx](registered_gpios[pin_idx]);
+            gpio_callbacks[pin_idx](&registered_gpios[pin_idx]);
         }
     }
 }
@@ -48,96 +48,96 @@ static void gpio_enable_clock(GPIO_TypeDef *port) {
     (void)RCC->AHB1ENR; // Достаточно одного раза в конце для задержки
 }
 
-void gpio_init(gpio_t gpio, gpio_mode_t mode, gpio_pull_t pull, gpio_otype_t otype, gpio_speed_t speed) {
-    assert(gpio.pin <= 15);
-    assert(gpio.port != NULL);
+void gpio_init(const gpio_t *gpio, gpio_mode_t mode, gpio_pull_t pull, gpio_otype_t otype, gpio_speed_t speed) {
+    assert(gpio->pin <= 15);
+    assert(gpio->port != NULL);
     // RCC
-    gpio_enable_clock(gpio.port);
-    uint32_t pin_pos = gpio.pin * 2U;
+    gpio_enable_clock(gpio->port);
+    uint32_t pin_pos = gpio->pin * 2U;
     // Set PIN mode
-    gpio.port->MODER &= ~(3U << pin_pos);
-    gpio.port->MODER |= ((uint32_t)mode << pin_pos);
-    // Pull
-    gpio.port->PUPDR &= ~(3U << pin_pos);
-    gpio.port->PUPDR |= ((uint32_t)pull << pin_pos);
-    // Output type (requiered 1 bit)
-    gpio.port->OTYPER &= ~(1U << gpio.pin);
-    gpio.port->OTYPER |= ((uint32_t)otype << gpio.pin);
-    // Output speed
-    gpio.port->OSPEEDR &= ~(3U << pin_pos);
-    gpio.port->OSPEEDR |= ((uint32_t)speed << pin_pos);
+    gpio->port->MODER &= ~(3U << pin_pos);
+    gpio->port->MODER |= ((uint32_t)mode << pin_pos);
+    // Pll
+    gpio->port->PUPDR &= ~(3U << pin_pos);
+    gpio->port->PUPDR |= ((uint32_t)pull << pin_pos);
+    // Otput type (requiered 1 bit)
+    gpio->port->OTYPER &= ~(1U << gpio->pin);
+    gpio->port->OTYPER |= ((uint32_t)otype << gpio->pin);
+    // Otput speed
+    gpio->port->OSPEEDR &= ~(3U << pin_pos);
+    gpio->port->OSPEEDR |= ((uint32_t)speed << pin_pos);
 }
 
-void gpio_init_input(gpio_t gpio, gpio_pull_t pull) {
-    assert(gpio.pin <= 15);
-    assert(gpio.port != NULL);
+void gpio_init_input(const gpio_t *gpio, gpio_pull_t pull) {
+    assert(gpio->pin <= 15);
+    assert(gpio->port != NULL);
     // RCC
-    gpio_enable_clock(gpio.port);
-    uint32_t pin_pos = gpio.pin * 2U;
+    gpio_enable_clock(gpio->port);
+    uint32_t pin_pos = gpio->pin * 2U;
     // Mode: Input (00)
-    gpio.port->MODER &= ~(3U << pin_pos);
-    // Pull
-    gpio.port->PUPDR &= ~(3U << pin_pos);
-    gpio.port->PUPDR |= ((uint32_t)pull << pin_pos);
+    gpio->port->MODER &= ~(3U << pin_pos);
+    // Pll
+    gpio->port->PUPDR &= ~(3U << pin_pos);
+    gpio->port->PUPDR |= ((uint32_t)pull << pin_pos);
 }
 
-void gpio_init_output(gpio_t gpio, bool push_pull) {
-    assert(gpio.pin <= 15);
-    assert(gpio.port != NULL);
+void gpio_init_output(const gpio_t *gpio, bool push_pull) {
+    assert(gpio->pin <= 15);
+    assert(gpio->port != NULL);
     // RCC
-    gpio_enable_clock(gpio.port);
-    uint32_t pin_pos = gpio.pin * 2U;
+    gpio_enable_clock(gpio->port);
+    uint32_t pin_pos = gpio->pin * 2U;
     // Mode: Output (01)
-    gpio.port->MODER &= ~(3U << pin_pos);
-    gpio.port->MODER |= (1U << pin_pos);
+    gpio->port->MODER &= ~(3U << pin_pos);
+    gpio->port->MODER |= (1U << pin_pos);
     // Output type: Push-Pull (0) or Open-Drain (1)
     if (push_pull) {
-        gpio.port->OTYPER &= ~(1U << gpio.pin);
+        gpio->port->OTYPER &= ~(1U << gpio->pin);
     } else {
-        gpio.port->OTYPER |= (1U << gpio.pin);
+        gpio->port->OTYPER |= (1U << gpio->pin);
     }
     // Default speed MEDIUM
-    gpio.port->OSPEEDR &= ~(3U << pin_pos);
-    gpio.port->OSPEEDR |= (1U << pin_pos);
+    gpio->port->OSPEEDR &= ~(3U << pin_pos);
+    gpio->port->OSPEEDR |= (1U << pin_pos);
 }
 
-void gpio_set_alternate_function(gpio_t gpio, uint8_t af_num) {
-    assert(gpio.pin <= 15);
-    assert(gpio.port != NULL);
+void gpio_set_alternate_function(const gpio_t *gpio, uint8_t af_num) {
+    assert(gpio->pin <= 15);
+    assert(gpio->port != NULL);
     assert(af_num <= 15);
-    uint8_t reg_idx = gpio.pin >> 3U; // (pin // 8), if 0..7 = 0, if 8..15 = 1
-    uint8_t bit_pos = (gpio.pin & 0x07U) * 4U; // pin % 0x07 * 4byte. 10pin & 0x07 = 2 -> 2 * 4 = 8 -> 8,9,10,11 
-    gpio.port->AFR[reg_idx] &= ~(0x0FU << bit_pos);
-    gpio.port->AFR[reg_idx] |= ((uint32_t)af_num << bit_pos);
+    uint8_t reg_idx = gpio->pin >> 3U; // (pin // 8), if 0..7 = 0, if 8..15 = 1
+    uint8_t bit_pos = (gpio->pin & 0x07U) * 4U; // pin % 0x07 * 4byte. 10pin & 0x07 = 2 -> 2 * 4 = 8 -> 8,9,10,11 
+    gpio->port->AFR[reg_idx] &= ~(0x0FU << bit_pos);
+    gpio->port->AFR[reg_idx] |= ((uint32_t)af_num << bit_pos);
 }
 
-void gpio_enable_irq(gpio_t gpio, edge_type_t edge) {
+void gpio_enable_irq(const gpio_t *gpio, edge_type_t edge) {
     // TODO  GPIO -> SYSCFG -> EXTI -> NVIC.
-    assert(gpio.pin <= 15);
-    assert(gpio.port != NULL);
+    assert(gpio->pin <= 15);
+    assert(gpio->port != NULL);
     // RCC SYSCFG
     RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
     (void)RCC->APB2ENR;
     // Сonnect the EXTI N line to the port M with SYSCFG
-    uint8_t exticr_idx = gpio.pin >> 2U; // each pin 4 bite
-    uint8_t pos = (gpio.pin & 0x03U) * 4U;
+    uint8_t exticr_idx = gpio->pin >> 2U; // each pin 4 bite
+    uint8_t pos = (gpio->pin & 0x03U) * 4U;
     uint32_t port_val = 0;
-    if(gpio.port == GPIOA) port_val = 0U;
-    else if(gpio.port == GPIOB) port_val = 1U;
-    else if(gpio.port == GPIOC) port_val = 2U;
-    else if(gpio.port == GPIOD) port_val = 3U;
-    else if(gpio.port == GPIOH) port_val = 7U;
+    if(gpio->port == GPIOA) port_val = 0U;
+    else if(gpio->port == GPIOB) port_val = 1U;
+    else if(gpio->port == GPIOC) port_val = 2U;
+    else if(gpio->port == GPIOD) port_val = 3U;
+    else if(gpio->port == GPIOH) port_val = 7U;
     SYSCFG->EXTICR[exticr_idx] &= ~(0x0FU << pos);
     SYSCFG->EXTICR[exticr_idx] |= (port_val << pos);
     // IMR Enable interrupt for EXTI N line
-    EXTI->IMR |= (1U << gpio.pin);
+    EXTI->IMR |= (1U << gpio->pin);
     // Select and enable edge trigger
-    if(edge == EDGE_RISING_t || edge == EDGE_BOTH_t) EXTI->RTSR  |= (1U << gpio.pin);
-    if(edge == EDGE_FALLING_t || edge == EDGE_BOTH_t) EXTI->FTSR |= (1U << gpio.pin);
+    if(edge == EDGE_RISING_t || edge == EDGE_BOTH_t) EXTI->RTSR  |= (1U << gpio->pin);
+    if(edge == EDGE_FALLING_t || edge == EDGE_BOTH_t) EXTI->FTSR |= (1U << gpio->pin);
     // Enable interrupt in NVIC
     IRQn_Type irq_type;
-    if(gpio.pin <= 4) irq_type = (IRQn_Type)(EXTI0_IRQn + gpio.pin);
-    else if(gpio.pin <= 9) irq_type = EXTI9_5_IRQn;
+    if(gpio->pin <= 4) irq_type = (IRQn_Type)(EXTI0_IRQn + gpio->pin);
+    else if(gpio->pin <= 9) irq_type = EXTI9_5_IRQn;
     else irq_type = EXTI15_10_IRQn;
 
     NVIC_EnableIRQ(irq_type);
