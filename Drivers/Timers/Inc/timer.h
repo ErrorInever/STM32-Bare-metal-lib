@@ -23,9 +23,9 @@ typedef struct {
 // Callback
 typedef void (*timer_basic_callback_t)(void *context);
 // Register callback to timer
-void timer_basic_set_callback(TIM_TypeDef *instance, timer_basic_callback_t callback, void *context);
+void timer_basic_set_callback(const timer_basic_t *timer, timer_basic_callback_t callback, void *context);
 // Init
-void timer_basic_init_ms(timer_basic_t *timer, uint32_t period_ms);
+void timer_basic_init_ms(const timer_basic_t *timer, uint32_t period_ms);
 // Operations
 //
 // Enable timer

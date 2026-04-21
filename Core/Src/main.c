@@ -10,7 +10,7 @@ void SystemClock_Config(void);
 
 // timer interrupt
 void led_toggle_handler(void *context) {
-  gpio_t *led = (gpio_t *)context;
+  gpio_t *led = (const gpio_t *)context;
   gpio_toggle(led);
 }
 
@@ -31,8 +31,8 @@ int main(void) {
   timer_basic_init_ms(&tim6, 500);
   timer_basic_init_ms(&tim7, 1000);
   // add callbacks
-  timer_basic_set_callback(TIM6, led_toggle_handler, &b_led);
-  timer_basic_set_callback(TIM7, led_toggle_handler, &r_led);
+  timer_basic_set_callback(&tim6, led_toggle_handler, (void *)&b_led);
+  timer_basic_set_callback(&tim7, led_toggle_handler, (void *)&r_led);
   // start
   timer_basic_start(&tim6);
   timer_basic_start(&tim7);

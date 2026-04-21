@@ -7,12 +7,12 @@
 static timer_basic_callback_t timer_basic_callback[2] = {NULL, NULL};
 static void *context_callback[2];
 
-static uint32_t get_timer_basic_index(TIM_TypeDef *instance) {
-    return (instance == TIM6) ? 0 : 1; // TIM6 0 idx, TIM7 1 idx
+static uint32_t get_timer_basic_index(const timer_basic_t *timer) {
+    return (timer->instance == TIM6) ? 0 : 1; // TIM6 0 idx, TIM7 1 idx
 }
 
-void timer_basic_set_callback(TIM_TypeDef *instance, timer_basic_callback_t callback, void *context) {
-    uint32_t idx = get_timer_basic_index(instance);
+void timer_basic_set_callback(const timer_basic_t *timer, timer_basic_callback_t callback, void *context) {
+    uint32_t idx = get_timer_basic_index(timer);
     timer_basic_callback[idx] = callback;
     context_callback[idx] = context;
 }
@@ -22,7 +22,7 @@ static void enable_clock(TIM_TypeDef *instance) {
     else if(instance == TIM7) { RCC->APB1ENR |= RCC_APB1ENR_TIM7EN; (void)RCC->APB1ENR; }
 }
 
-void timer_basic_init_ms(timer_basic_t *timer, uint32_t period_ms) {
+void timer_basic_init_ms(const timer_basic_t *timer, uint32_t period_ms) {
     // RCC
     assert(timer->instance != NULL);
     assert(timer->bus_freq >= 1U && timer->bus_freq <= 184U);
