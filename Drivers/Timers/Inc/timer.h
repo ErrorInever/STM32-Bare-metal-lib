@@ -23,6 +23,7 @@ typedef struct {
 typedef struct {
     TIM_TypeDef *instance;      // TIM2 or TIM3
     uint32_t bus_freq;
+    bool status;
 } timer_general_t;
 
 // Callback
@@ -41,15 +42,26 @@ void timer_general_pwm_channel_config(const timer_general_t *timer, uint8_t chan
 static inline void timer_basic_start(const timer_basic_t *timer) {
     timer->instance->CR1 |= TIM_CR1_CEN;
 }
+static inline void timer_general_start(const timer_general_t *timer) {
+    timer->instance->CR1 |= TIM_CR1_CEN;
+}
 // Disable timer
 static inline void timer_basic_stop(const timer_basic_t *timer) {
     timer->instance->CR1 &= ~TIM_CR1_CEN;
     timer->instance->SR &= ~TIM_SR_UIF;
 }
+static inline void timer_general_stop(const timer_general_t *timer) {
+    timer->instance->CR1 &= ~TIM_CR1_CEN;
+    timer->instance->SR &= ~TIM_SR_UIF;
+}
 // Get status
-static inline bool timer_get_status(const timer_basic_t *timer) {
+static inline bool timer_basic_get_status(const timer_basic_t *timer) {
     return timer->status;
 }
+static inline bool timer_general_get_status(const timer_general_t *timer) {
+    return timer->status;
+}
+
 // Set one-pulse mode
 static inline void timer_basic_set_one_pulse(const timer_basic_t *timer, bool enable) {
     if (enable) timer->instance->CR1 |= TIM_CR1_OPM;

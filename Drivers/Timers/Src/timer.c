@@ -18,10 +18,10 @@ void timer_basic_set_callback(const timer_basic_t *timer, timer_basic_callback_t
 }
 
 static void enable_clock(TIM_TypeDef *instance) {
-    if(instance == TIM6) { RCC->APB1ENR |= RCC_APB1ENR_TIM6EN }
-    else if(instance == TIM7) { RCC->APB1ENR |= RCC_APB1ENR_TIM7EN }
-    else if(instance == TIM2) { RCC->APB1ENR |= RCC_APB1ENR_TIM2EN }
-    else if(instance == TIM3) { RCC->APB1ENR |= RCC_APB1ENR_TIM3EN }
+    if(instance == TIM6) { RCC->APB1ENR |= RCC_APB1ENR_TIM6EN; }
+    else if(instance == TIM7) { RCC->APB1ENR |= RCC_APB1ENR_TIM7EN; }
+    else if(instance == TIM2) { RCC->APB1ENR |= RCC_APB1ENR_TIM2EN; }
+    else if(instance == TIM3) { RCC->APB1ENR |= RCC_APB1ENR_TIM3EN; }
     (void)RCC->APB1ENR; 
 }
 
@@ -49,7 +49,7 @@ void timer_general_init_ms(const timer_general_t *timer, uint32_t pwm_freq, uint
     enable_clock(timer->instance);
     // Configure PWM
     timer->instance->PSC = (timer->bus_freq * 100U) - 1U; // 10Khz 
-    uint32_t period = 10000U / pwm_freq_hz;
+    uint32_t period = 10000U / pwm_freq;
     timer->instance->ARR = period - 1U;
     timer->instance->CCR1 = (period * dc_percent) / 100U;
 }

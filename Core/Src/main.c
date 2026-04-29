@@ -8,53 +8,71 @@
 
 void SystemClock_Config(void);
 
-// timer interrupt
-void led_toggle_handler(void *context) {
-  gpio_t *led = (const gpio_t *)context;
-  gpio_toggle(led);
-}
 
 int main(void) {
   SystemClock_Config();
   systick_config_ms(100);
 
-  static const gpio_t b_led = {GPIOC, 0};
-  static const gpio_t r_led = {GPIOC, 1};
+  static const gpio_t b_led = {GPIOA, 0};
+  static const gpio_t r_led = {GPIOA, 1};
+  static const gpio_t w_led = {GPIOB, 10};
+  static const gpio_t g_led = {GPIOB, 3};
 
-  gpio_init_output(&b_led, true);
-  gpio_init_output(&r_led, true);
+
+  gpio_init(&b_led, GPIO_MODE_AF_t, GPIO_PULL_NONE_t, 
+    GPIO_OTYPE_PP_t, GPIO_SPEED_HIGH_t);
+  gpio_init(&r_led, GPIO_MODE_AF_t, GPIO_PULL_NONE_t, 
+    GPIO_OTYPE_PP_t, GPIO_SPEED_HIGH_t);
+  gpio_init(&w_led, GPIO_MODE_AF_t, GPIO_PULL_NONE_t, 
+    GPIO_OTYPE_PP_t, GPIO_SPEED_HIGH_t);
+  gpio_init(&g_led, GPIO_MODE_AF_t, GPIO_PULL_NONE_t, 
+    GPIO_OTYPE_PP_t, GPIO_SPEED_HIGH_t);
+
+  gpio_set_alternate_function(&b_led, 1);
+  gpio_set_alternate_function(&r_led, 1);
+  gpio_set_alternate_function(&w_led, 1);
+  gpio_set_alternate_function(&g_led, 1);
 
   // setup timers
-  timer_basic_t tim6 = {TIM6, 50};
-  timer_basic_t tim7 = {TIM7, 50};
+  timer_general_t tim2 = {TIM2, 50};
   // init
-  timer_basic_init_ms(&tim6, 500);
-  timer_basic_init_ms(&tim7, 1000);
-  // add callbacks
-  timer_basic_set_callback(&tim6, led_toggle_handler, (void *)&b_led);
-  timer_basic_set_callback(&tim7, led_toggle_handler, (void *)&r_led);
-  // start
-  timer_basic_start(&tim6);
-  timer_basic_start(&tim7);
+  timer_general_init_ms(&tim2, 150, 0);
+  timer_general_pwm_channel_config(&tim2, 1);
+  timer_general_pwm_channel_config(&tim2, 2);
+  timer_general_pwm_channel_config(&tim2, 3);
+  timer_general_pwm_channel_config(&tim2, 4);
+  // dc
+  timer_general_set_duty(&tim2, 1, 10);
+  timer_general_set_duty(&tim2, 2, 20);
+  timer_general_set_duty(&tim2, 3, 30);
+  timer_general_set_duty(&tim2, 4, 40);
 
-  bool fast_mode = true;
+  timer_general_start(&tim2);
 
-while (1) {
-    delay_ms(5000);
-    
-    if (fast_mode) {
-        timer_basic_set_period_ms(&tim6, 20);
-        timer_basic_set_period_ms(&tim7, 50);
-    } else {
-        timer_basic_set_period_ms(&tim6, 100);
-        timer_basic_set_period_ms(&tim7, 200);
-    }
-    
-    fast_mode = !fast_mode; // Меняем режим для следующей итерации
+  int8_t step = 1;     // Шаг изменения (1%)
+  uint8_t duty = 0;    // Текущая скважность
+
+  while (1) {
+      // 1. Сначала обновляем железо
+      timer_general_set_duty(&tim2, 1, duty);
+      timer_general_set_duty(&tim2, 2, duty);
+      timer_general_set_duty(&tim2, 3, duty);
+      timer_general_set_duty(&tim2, 4, duty);
+      
+      duty += step;
+
+
+      if (duty >= 100) {
+          duty = 100;
+          step = -1;
+      } else if (duty <= 0) {
+          duty = 0;
+          step = 1;
+      }
+
+      delay_ms(20); 
+  }
 }
-
-}
-
 /**
   * @brief System Clock Configuration
   * @retval None
