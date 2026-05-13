@@ -48,6 +48,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Drivers/GPIO/Src/gpio.c
     Drivers/Timers/Src/systick.c
     Drivers/Timers/Src/timer.c
+    Drivers/DataST/Src/ring_buffer.c
 )
 
 # Add include paths
@@ -56,6 +57,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     Drivers/GPIO/Inc
     Drivers/Timers/Inc
     Drivers/Timers/Inc
+    Drivers/DataST/Inc
 )
 
 # Add project symbols (macros)
