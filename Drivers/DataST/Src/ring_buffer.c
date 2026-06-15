@@ -6,38 +6,46 @@
 #define ENTER_CRITICAL() __disable_irq()
 #define EXIT_CRITICAL()  __enable_irq()
 
-void ring_buffer_init(RingBuffer_t *buffer, void *storage, size_t size, size_t element_size) {
-    // check size is power of two
-    buffer->buffer = (uint8_t *)storage;
-    buffer->bitmask = size - 1;
-    buffer->element_size = element_size;
-    buffer->head = 0;
-    buffer->tail = 0;
+bool ring_buffer_init(RingBuffer_t *rb, void *storage, size_t size, size_t element_size) {
+    if (!rb || !storage || element_size == 0 || 
+        size == 0 || (size & (size - 1)) != 0) return false;
+    rb->buff = (uint8_t *)storage;
+    rb->size = size;
+    rb->mask = size - 1;
+    rb->element_size = element_size;
+    rb->head = 0;
+    rb->tail = 0;
+    return true;
 }
 
-void ring_buffer_push(RingBuffer_t *buffer, const void *data) {
-    if(is_full(buffer)) {
-        buffer->tail = (buffer->tail + 1) & buffer->bitmask;
-    }
-    void *dest = &buffer->buffer[buffer->head * buffer->element_size];
-    memcpy(dest, data, buffer->element_size);
-    buffer->head = (buffer->head + 1) & buffer->bitmask;
+bool ring_buffer_push(RingBuffer_t *rb, const void *data) {
+    if (!rb || !data) return false;
+    else if(is_full(rb)) return false;
+    void *dest = &rb->buff[rb->head * rb->element_size];
+    memcpy(dest, data, rb->element_size);
+    rb->head = (rb->head + 1) & rb->mask;
+    return true;
 }
 
-void ring_buffer_push_safe(RingBuffer_t *buffer, const void *data) {
-    ENTER_CRITICAL();
-    ring_buffer_push(buffer, data);
-    EXIT_CRITICAL();
+bool ring_buffer_push_overwrite(RingBuffer_t *rb, const void *data) {
+    if (!rb || !data) return false;
+    if(is_full(rb)) rb->tail = (rb->tail + 1) & rb->mask;
+    uint8_t *dest = &rb->buff[rb->head * rb->element_size];
+    memcpy(dest, data, rb->element_size);
+    rb->head = (rb->head + 1) & rb->mask;
+    return true;
 }
 
-void ring_buffer_pop(RingBuffer_t *buffer, void *out_data) {
-    if (is_empty(buffer)) return;
-    void *src = &buffer->buffer[buffer->tail * buffer->element_size];
-    memcpy(out_data, src, buffer->element_size);
-    buffer->tail = (buffer->tail + 1) & buffer->bitmask;
+bool ring_buffer_pop(RingBuffer_t *rb, void *out_data) {
+    if (is_empty(rb)) return false;
+    uint8_t *src = &rb->buff[rb->tail * rb->element_size];
+    memcpy(out_data, src, rb->element_size);
+    rb->tail = (rb->tail + 1) & rb->mask;
+    return true;
 }
-void ring_buffer_peek(const RingBuffer_t *buffer, void *out_data) {
-    // if not empty
-    void *src = &buffer->buffer[buffer->tail * buffer->element_size];
-    memcpy(out_data, src, buffer->element_size);
+bool ring_buffer_peek(const RingBuffer_t *rb, void *out_data) {
+    if (is_empty(rb)) return false;
+    void *src = &rb->buff[rb->tail * rb->element_size];
+    memcpy(out_data, src, rb->element_size);
+    return true;
 }
