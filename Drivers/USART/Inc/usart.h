@@ -10,13 +10,16 @@ typedef struct {
     USART_TypeDef *instance;    // USART1, USART2, USART3, USART6
     uint32_t baudrate;          // speed
     uint32_t bus_freq;          // freq of bus: USART1, USART6 = APB2,  USART2, USART3, = APB1
-    RingBuffer_t *rx_buffer;    // pointer to ringbuffer struct
+    RingBuffer_t *rx_buffer;    // ring buffer for recive
+    RingBuffer_t *tx_buffer;    // ring buffer for transmit
 } usart_t;
 
-// Callback for USART
-typedef void (*usart_callback_t)(void *context);
-void usart_set_callback(const USART_TypeDef *usart, usart_callback_t callback, void *context);
-// Init USART
 void usart_init(usart_t *usart, uint32_t baudrate);
+void usart_send(const usart_t *usart, const char *data);
+void usart_printf(const usart_t *usart, const char *format, ...);
+
+static inline uint8_t usart_recive_byte(const USART_TypeDef *instance) {
+    return instance->DR & 0xFF;
+}
 
 #endif

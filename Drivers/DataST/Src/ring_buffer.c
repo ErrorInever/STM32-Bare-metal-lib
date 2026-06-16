@@ -20,7 +20,11 @@ bool ring_buffer_init(RingBuffer_t *rb, void *storage, size_t size, size_t eleme
 
 bool ring_buffer_push(RingBuffer_t *rb, const void *data) {
     if (!rb || !data) return false;
-    else if(is_full(rb)) return false;
+    else if(is_full(rb)) {
+        rb->overflow = true;
+        rb->dropped++;
+        return false;
+    }
     void *dest = &rb->buff[rb->head * rb->element_size];
     memcpy(dest, data, rb->element_size);
     rb->head = (rb->head + 1) & rb->mask;

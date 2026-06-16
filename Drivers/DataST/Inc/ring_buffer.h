@@ -10,6 +10,8 @@ typedef struct {
     size_t mask;            // bit mask for '&' operation (buff size - 1)
     volatile size_t head;   // write index (producer)
     volatile size_t tail;   // read index (consumer)
+    bool overflow;          // overflow flag
+    uint32_t dropped;       // count of data lost
 } RingBuffer_t;
 
 /**
