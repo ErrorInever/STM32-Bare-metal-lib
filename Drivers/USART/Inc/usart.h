@@ -5,6 +5,7 @@
 #include "stm32f446xx.h"
 #include "ring_buffer.h"
 #include <assert.h>
+#include <stdbool.h>
 
 typedef struct {
     USART_TypeDef *instance;    // USART1, USART2, USART3, USART6
@@ -17,6 +18,11 @@ typedef struct {
 void usart_init(usart_t *usart, uint32_t baudrate);
 void usart_send(const usart_t *usart, const char *data);
 void usart_printf(const usart_t *usart, const char *format, ...);
+bool usart_avaible(const usart_t *usart);
+bool usart_read_byte(const usart_t *usart, uint8_t *out_data);
+uint32_t usart_read_until(const usart_t *usart, uint8_t *dest, uint32_t max_len, uint8_t terminator);
+void process_simple_commands(const usart_t *usart);
+
 
 static inline uint8_t usart_recive_byte(const USART_TypeDef *instance) {
     return instance->DR & 0xFF;

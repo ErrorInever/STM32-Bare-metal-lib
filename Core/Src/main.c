@@ -4,6 +4,8 @@
 #include "stm32f446xx.h"
 #include "systick.h"
 #include "timer.h"
+#include <string.h>
+#include <usart.h>
 #include <stdint.h>
 
 void SystemClock_Config(void);
@@ -13,66 +15,31 @@ int main(void) {
   SystemClock_Config();
   systick_config_ms(100);
 
-  static const gpio_t b_led = {GPIOA, 0};
-  static const gpio_t r_led = {GPIOA, 1};
-  static const gpio_t w_led = {GPIOB, 10};
-  static const gpio_t g_led = {GPIOB, 3};
+  static const gpio_t usart2_pa2 = {GPIOA, 2};
+  static const gpio_t usart2_pa3 = {GPIOA, 3};
 
-
-  gpio_init(&b_led, GPIO_MODE_AF_t, GPIO_PULL_NONE_t, 
+  gpio_init(&usart2_pa2, GPIO_MODE_AF_t, GPIO_PULL_UP_t, 
     GPIO_OTYPE_PP_t, GPIO_SPEED_HIGH_t);
-  gpio_init(&r_led, GPIO_MODE_AF_t, GPIO_PULL_NONE_t, 
-    GPIO_OTYPE_PP_t, GPIO_SPEED_HIGH_t);
-  gpio_init(&w_led, GPIO_MODE_AF_t, GPIO_PULL_NONE_t, 
-    GPIO_OTYPE_PP_t, GPIO_SPEED_HIGH_t);
-  gpio_init(&g_led, GPIO_MODE_AF_t, GPIO_PULL_NONE_t, 
+  gpio_init(&usart2_pa3, GPIO_MODE_AF_t, GPIO_PULL_UP_t, 
     GPIO_OTYPE_PP_t, GPIO_SPEED_HIGH_t);
 
-  gpio_set_alternate_function(&b_led, 1);
-  gpio_set_alternate_function(&r_led, 1);
-  gpio_set_alternate_function(&w_led, 1);
-  gpio_set_alternate_function(&g_led, 1);
+  gpio_set_alternate_function(&usart2_pa2, 7);
+  gpio_set_alternate_function(&usart2_pa3, 7);
+  
+  usart_t usart_1 = {
+    .instance = USART2,
+    .bus_freq = 25000000
+  };
 
-  // setup timers
-  timer_general_t tim2 = {TIM2, 50};
-  // init
-  timer_general_init_ms(&tim2, 150, 0);
-  timer_general_pwm_channel_config(&tim2, 1);
-  timer_general_pwm_channel_config(&tim2, 2);
-  timer_general_pwm_channel_config(&tim2, 3);
-  timer_general_pwm_channel_config(&tim2, 4);
-  // dc
-  timer_general_set_duty(&tim2, 1, 10);
-  timer_general_set_duty(&tim2, 2, 20);
-  timer_general_set_duty(&tim2, 3, 30);
-  timer_general_set_duty(&tim2, 4, 40);
+  usart_init(&usart_1, 115200);
 
-  timer_general_start(&tim2);
-
-  int8_t step = 1;     // Шаг изменения (1%)
-  uint8_t duty = 0;    // Текущая скважность
-
-  while (1) {
-      // 1. Сначала обновляем железо
-      timer_general_set_duty(&tim2, 1, duty);
-      timer_general_set_duty(&tim2, 2, duty);
-      timer_general_set_duty(&tim2, 3, duty);
-      timer_general_set_duty(&tim2, 4, duty);
-      
-      duty += step;
-
-
-      if (duty >= 100) {
-          duty = 100;
-          step = -1;
-      } else if (duty <= 0) {
-          duty = 0;
-          step = 1;
-      }
-
-      delay_ms(20); 
+  
+  while(1) {
+    process_simple_commands(&usart_1);
   }
+
 }
+
 /**
   * @brief System Clock Configuration
   * @retval None

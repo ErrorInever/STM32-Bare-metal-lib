@@ -3,6 +3,11 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
+
+
+#define ENTER_CRITICAL() __disable_irq()
+#define EXIT_CRITICAL()  __enable_irq()
 
 // Size of ringbuffer: must be a power of two
 #define RING_BUF_SIZE 128
@@ -75,6 +80,14 @@ void usart_send(const usart_t *usart, const char *str) {
     EXIT_CRITICAL();
 }
 
+bool usart_avaible(const usart_t *usart) {
+    return !is_empty(usart->rx_buffer);
+}
+
+bool usart_read_byte(const usart_t *usart, uint8_t *out_data) {
+    return ring_buffer_pop(usart->rx_buffer, out_data);
+}
+
 void usart_printf(const usart_t *usart, const char *format, ...) {
     char temp_str[128]; // temp buffer for formatted str
     va_list args;
@@ -85,10 +98,8 @@ void usart_printf(const usart_t *usart, const char *format, ...) {
 
     if (len < 0)
         return;
-
     if (len >= sizeof(temp_str))
         len = sizeof(temp_str) - 1;
-
     if(len > 0) {
         // Push each character into the ring buffer
         ENTER_CRITICAL();
@@ -97,6 +108,28 @@ void usart_printf(const usart_t *usart, const char *format, ...) {
         }
         usart->instance->CR1 |= USART_CR1_TXEIE;
         EXIT_CRITICAL();
+    }
+}
+
+void process_simple_commands(const usart_t *usart) {
+    uint8_t ch;
+    // if rx not empty
+    if(ring_buffer_pop(usart->rx_buffer, &ch)) {
+        if (ch == '1') {
+            usart_send(usart, "LOVIL 1: LED ON\r\n");
+            usart_printf(usart, "TEST SIMPLE 1 + 1 = %d", 2);
+        } 
+        else if (ch == '2') {
+            usart_send(usart, "LOVIL 2: LED OFF\r\n");
+        } 
+        else if (ch == 'h' || ch == 'H') {
+            usart_send(usart, "REZHIM: 1-ON, 2-OFF, H-HELP\r\n");
+        } 
+        else {
+            // echo-mode
+            while (!(usart->instance->SR & USART_SR_TXE));
+            usart->instance->DR = ch;
+        }
     }
 }
 
