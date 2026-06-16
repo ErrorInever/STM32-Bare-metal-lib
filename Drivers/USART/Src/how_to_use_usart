@@ -1,0 +1,41 @@
+
+#include "main.h"
+#include "gpio.h"
+#include "stm32f446xx.h"
+#include "systick.h"
+#include "timer.h"
+#include <string.h>
+#include <usart.h>
+#include <stdint.h>
+
+void SystemClock_Config(void);
+
+
+int main(void) {
+  SystemClock_Config();
+  systick_config_ms(100);
+
+  static const gpio_t usart2_pa2 = {GPIOA, 2};
+  static const gpio_t usart2_pa3 = {GPIOA, 3};
+
+  gpio_init(&usart2_pa2, GPIO_MODE_AF_t, GPIO_PULL_UP_t, 
+    GPIO_OTYPE_PP_t, GPIO_SPEED_HIGH_t);
+  gpio_init(&usart2_pa3, GPIO_MODE_AF_t, GPIO_PULL_UP_t, 
+    GPIO_OTYPE_PP_t, GPIO_SPEED_HIGH_t);
+
+  gpio_set_alternate_function(&usart2_pa2, 7);
+  gpio_set_alternate_function(&usart2_pa3, 7);
+  
+  usart_t usart_1 = {
+    .instance = USART2,
+    .bus_freq = 25000000
+  };
+
+  usart_init(&usart_1, 115200);
+
+  
+  while(1) {
+    process_simple_commands(&usart_1);
+  }
+
+}
