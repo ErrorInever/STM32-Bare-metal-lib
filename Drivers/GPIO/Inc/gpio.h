@@ -11,13 +11,20 @@ extern "C" {
 #include <stdbool.h>
 #include "stm32f446xx.h"
 
-// GPIO object
+
+/** 
+* @brief GPIO descriptor. 
+* 
+* Represents a single GPIO pin. 
+*/
 typedef struct {
-    GPIO_TypeDef *port;   // ports: A, B, C
-    uint16_t pin;         // 0..15 (bit index)
+    GPIO_TypeDef *port;   ///< GPIO peripheral (GPIOA, GPIOB, ...)
+    uint16_t pin;         ///< Pin number (0–15)
 } gpio_t;
 
-// Pin modes
+/** 
+* @brief GPIO operating mode.
+ */
 typedef enum {
     GPIO_MODE_INPUT_t  = 0x00,
     GPIO_MODE_OUTPUT_t = 0x01,
@@ -25,20 +32,26 @@ typedef enum {
     GPIO_MODE_ANALOG_t = 0x03
 } gpio_mode_t;
 
-// Pull modes
+/** 
+* @brief Internal pull resistor configuration. 
+*/
 typedef enum {
     GPIO_PULL_NONE_t = 0x00,
     GPIO_PULL_UP_t   = 0x01,
     GPIO_PULL_DOWN_t = 0x02
 } gpio_pull_t;
 
-// OTYPER (Output Type Register)
+/** 
+* @brief Output driver type. 
+*/
 typedef enum {
     GPIO_OTYPE_PP_t = 0x00,  // Push-pull
     GPIO_OTYPE_OD_t = 0x01   // Open-drain
 } gpio_otype_t;
 
-// OSPEEDR
+/** 
+* @brief GPIO output speed. 
+*/
 typedef enum {
     GPIO_SPEED_LOW_t       = 0x00,
     GPIO_SPEED_MEDIUM_t    = 0x01,
@@ -46,34 +59,111 @@ typedef enum {
     GPIO_SPEED_VERY_HIGH_t = 0x03
 } gpio_speed_t;
 
-// Interrupt edges types
+/** 
+* @brief Interrupt trigger edge. 
+*/
 typedef enum {
     EDGE_RISING_t,
     EDGE_FALLING_t,
     EDGE_BOTH_t
 } edge_type_t;
 
-// Callback function type
+/** 
+* @brief GPIO interrupt callback function. 
+* 
+* @param gpio Pointer to GPIO object that generated interrupt. 
+*/
 typedef void (*gpio_callback_t)(const gpio_t *gpio);
 
-// GPIO INIT
-//
-// Universal pin init function
-void gpio_init(const gpio_t *gpio, gpio_mode_t mode, gpio_pull_t pull, gpio_otype_t otype, gpio_speed_t speed);
-// Simplified setup of a pin as an input.
+
+/** 
+* @brief Initialize GPIO with full configuration. 
+* 
+* Enables GPIO peripheral clock and configures: 
+* - pin mode 
+* - pull resistors 
+* - output type 
+* - output speed 
+* 
+* @param gpio GPIO object. 
+* @param mode Pin operating mode. 
+* @param pull Pull resistor configuration. 
+* @param otype Output driver type. 
+* @param speed Output speed. 
+*/
+void gpio_init(const gpio_t *gpio, gpio_mode_t mode, gpio_pull_t pull, 
+    gpio_otype_t otype, gpio_speed_t speed);
+
+
+/** 
+* @brief Configure GPIO as input. 
+* 
+* Simplified wrapper around gpio_init(). 
+* 
+* @param gpio GPIO object. 
+* @param pull Pull resistor configuration. 
+*/
 void gpio_init_input(const gpio_t *gpio, gpio_pull_t pull);
-// Simplified setup of a pin as an output. 
+
+
+/** 
+* @brief Configure GPIO as output. 
+* 
+* Uses medium output speed by default. 
+* 
+* @param gpio GPIO object. 
+* @param push_pull 
+*       true → Push-pull output 
+*       false → Open-drain output 
+*/
 void gpio_init_output(const gpio_t *gpio, bool push_pull);
-// Set alternate function
+
+
+/** 
+* @brief Configure alternate function for a pin. 
+* 
+* Pin must already be configured in AF mode. 
+* 
+* @param gpio GPIO object. 
+* @param af_num Alternate function number (0–15). 
+*/
 void gpio_set_alternate_function(const gpio_t *gpio, uint8_t af_num);
-// Enable interrupts
+
+
+/** 
+* @brief Enable EXTI interrupt for GPIO. 
+* 
+* Configures: 
+* - SYSCFG EXTI mapping 
+* - EXTI trigger 
+* - NVIC interrupt 
+* 
+* @param gpio GPIO object. 
+* @param edge Interrupt trigger type. 
+*/
 void gpio_enable_irq(const gpio_t *gpio, edge_type_t edge);
-// Set callback function for interrupt
+
+
+/** 
+* @brief Register interrupt callback. 
+* 
+* Only one callback per EXTI line is supported. 
+* 
+* @param gpio GPIO object. 
+* @param callback Callback function. 
+*/
 void gpio_set_callback(const gpio_t *gpio, gpio_callback_t callback);
 
-// Fast opetations
-//
-// Writes a logic level to a pin. The point is to set the exit state.
+
+
+/** 
+* @brief Write logical state to GPIO output. 
+* 
+* Uses atomic BSRR register access. 
+* 
+* @param gpio GPIO object. 
+* @param state 0 = LOW, non-zero = HIGH. 
+*/
 static inline void gpio_write(const gpio_t *gpio, uint8_t state) {
     if(state) {
         gpio->port->BSRR = (1U << gpio->pin);
@@ -81,19 +171,55 @@ static inline void gpio_write(const gpio_t *gpio, uint8_t state) {
         gpio->port->BSRR = (1U << (gpio->pin + 16U));
     }
 }
-// Reads the current logic level. The point is to get the actual state of the line.
+
+
+/** 
+* @brief Read current logic level. 
+* 
+* Reads actual pin state from IDR register. 
+* 
+* @param gpio GPIO object. 
+* 
+* @return Current logic level. 
+*/
 static inline uint8_t gpio_read(const gpio_t *gpio) {
     return (gpio->port->IDR & (1U << gpio->pin)) ? 1 : 0;
 }
-// Sets the pin to 1. The point is to quickly enable the PIN
+
+
+/** 
+* @brief Set output to HIGH. 
+* 
+* Atomic operation using BSRR. 
+* 
+* @param gpio GPIO object. 
+*/
 static inline void gpio_set(const gpio_t *gpio) {
     gpio->port->BSRR = (1U << gpio->pin);
 } 
-// Resets the pin to 0. The point is to quickly turn off the pin
+
+
+/** 
+* @brief Set output to LOW. 
+* 
+* Atomic operation using BSRR. 
+* 
+* @param gpio GPIO object. 
+*/
 static inline void gpio_reset(const gpio_t *gpio) {
     gpio->port->BSRR = (1U << (gpio->pin + 16U));
 }
-// Inverts the current state of the output. The point is to switch the pin without knowing the current state from the outside.
+
+
+/** 
+* @brief Toggle output state. 
+* 
+* Uses ODR register modification. 
+* 
+* @warning Operation is not atomic. 
+* 
+* @param gpio GPIO object.
+*/
 static inline void gpio_toggle(const gpio_t *gpio) {
     gpio->port->ODR ^= (1U << gpio->pin);
 }
