@@ -135,7 +135,7 @@ void process_simple_commands(const usart_t *usart) {
 
 static void generic_usart_irq_handler(USART_TypeDef *instance, uint8_t idx) {
     // error flags
-    if(instance->SR & (USART_SR_ORE || USART_SR_NE | USART_SR_FE | USART_SR_PE)) {
+    if(instance->SR & (USART_SR_ORE | USART_SR_NE | USART_SR_FE | USART_SR_PE)) {
         volatile uint32_t dummy;
         dummy = instance->SR;       // read SR
         dummy = instance->DR;       // read DR (reset error flags)
