@@ -60,7 +60,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     Drivers/Timers/Inc
     Drivers/Timers/Inc
     Drivers/DataST/Inc
-    Drivers/USART/Inc'
+    Drivers/USART/Inc
     Drivers/I2C/Inc
 )
 
