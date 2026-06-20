@@ -47,7 +47,7 @@ typedef void (*i2c_callback_t)(i2c_status_t status);
 typedef struct {
     I2C_TypeDef *bus;               // I2C 1-2-3
     volatile i2c_state_t state;     // current state
-    volatile i2c_status_t status;   // OK, NACK
+    volatile i2c_status_t status;   // return status
     i2c_transaction_t ctx;          // current context
     uint16_t tx_cnt;                // current tx index
     uint16_t rx_cnt;                // current rx index

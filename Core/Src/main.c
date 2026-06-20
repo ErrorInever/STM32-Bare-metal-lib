@@ -1,15 +1,42 @@
 
 #include "main.h"
+#include "cmsis_gcc.h"
 #include "gpio.h"
 #include "stm32f446xx.h"
+#include "stm32f4xx_hal_gpio.h"
 #include "systick.h"
 #include "timer.h"
 #include <string.h>
 #include <usart.h>
 #include <stdint.h>
+#include <i2c.h>
+#include <stdio.h>
 
 void SystemClock_Config(void);
 
+bool ping_oled(void) {
+    I2C1->CR1 |= I2C_CR1_START; // generate START
+    // wait flag SB in SR1
+    uint32_t timeout = 10000;
+    while (!(I2C1->SR1 & I2C_SR1_SB)) if (--timeout == 0) return false;
+    // send OLED adress
+    I2C1->DR = 0x78;
+    timeout = 10000;
+    // wait flag ADDR in SR1
+    while(!(I2C1->SR1 & I2C_SR1_ADDR)) {
+        if(I2C1->SR1 & I2C_SR1_AF) { // if get NACK i.e. OLED not responsed
+            I2C1->CR1 |= I2C_CR1_STOP;
+            return false;
+        }
+        if(--timeout == 0) return false;
+    }
+    // reset flag ADDR (stm32 specific)
+    (void)I2C1->SR1;
+    (void)I2C1->SR2;
+    // generate STOP
+    I2C1->CR1 |= I2C_CR1_STOP;
+    return true; // display OK
+}
 
 int main(void) {
   SystemClock_Config();
@@ -33,9 +60,54 @@ int main(void) {
 
   usart_init(&usart_1, 115200);
 
+  // Init I2C
+  static const gpio_t i2c1_sda = {GPIOB, 9};
+  static const gpio_t i2c1_scl = {GPIOB, 8};
+
+  gpio_init(&i2c1_sda, GPIO_MODE_AF_t, GPIO_PULL_UP_t,
+     GPIO_OTYPE_OD_t, GPIO_SPEED_HIGH_t);
+  gpio_init(&i2c1_scl, GPIO_MODE_AF_t, GPIO_PULL_UP_t,
+     GPIO_OTYPE_OD_t, GPIO_SPEED_HIGH_t);
+
+  gpio_set_alternate_function(&i2c1_sda, 4);
+  gpio_set_alternate_function(&i2c1_scl, 4);
+
+  static i2c_t i2c1 = {
+    .bus = I2C1
+  };
+
+  i2c_init(&i2c1, 25, I2C_MODE_STANDARD_100KHZ);
+
+  static uint8_t tx_buff[128] = {0};
+  static uint8_t rx_buff[128] = {0};
+
+  i2c_transaction_t wrong_tr = {
+    .addr = 0x7F,
+    .tx_buff = tx_buff,
+    .tx_len = 128,
+    .rx_buff = rx_buff,
+    .rx_len = 128,
+    .repeated_start = false
+  };
+
+  uint8_t oled_cmd[] = {0x00, 0xAF};
+
+  i2c_transaction_t oled_tr = {
+      .addr = 0x3C,          // Чистый 7-битный адрес!
+      .tx_buff = oled_cmd,
+      .tx_len = 2,
+      .rx_buff = NULL,
+      .rx_len = 0,
+      .repeated_start = false
+  };
+
+  //i2c_execute(&i2c1, &oled_tr);
+
+
   
   while(1) {
-    process_simple_commands(&usart_1);
+    ping_oled();
+    delay_ms(500);
   }
 
 }
