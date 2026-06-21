@@ -14,30 +14,6 @@
 
 void SystemClock_Config(void);
 
-bool ping_oled(void) {
-    I2C1->CR1 |= I2C_CR1_START; // generate START
-    // wait flag SB in SR1
-    uint32_t timeout = 10000;
-    while (!(I2C1->SR1 & I2C_SR1_SB)) if (--timeout == 0) return false;
-    // send OLED adress
-    I2C1->DR = 0x78;
-    timeout = 10000;
-    // wait flag ADDR in SR1
-    while(!(I2C1->SR1 & I2C_SR1_ADDR)) {
-        if(I2C1->SR1 & I2C_SR1_AF) { // if get NACK i.e. OLED not responsed
-            I2C1->CR1 |= I2C_CR1_STOP;
-            return false;
-        }
-        if(--timeout == 0) return false;
-    }
-    // reset flag ADDR (stm32 specific)
-    (void)I2C1->SR1;
-    (void)I2C1->SR2;
-    // generate STOP
-    I2C1->CR1 |= I2C_CR1_STOP;
-    return true; // display OK
-}
-
 int main(void) {
   SystemClock_Config();
   systick_config_ms(100);
@@ -53,12 +29,12 @@ int main(void) {
   gpio_set_alternate_function(&usart2_pa2, 7);
   gpio_set_alternate_function(&usart2_pa3, 7);
   
-  usart_t usart_1 = {
+  usart_t usart_2 = {
     .instance = USART2,
     .bus_freq = 25000000
   };
 
-  usart_init(&usart_1, 115200);
+  usart_init(&usart_2, 115200);
 
   // Init I2C
   static const gpio_t i2c1_sda = {GPIOB, 9};
@@ -72,44 +48,51 @@ int main(void) {
   gpio_set_alternate_function(&i2c1_sda, 4);
   gpio_set_alternate_function(&i2c1_scl, 4);
 
+
   static i2c_t i2c1 = {
     .bus = I2C1
   };
 
+  
+
   i2c_init(&i2c1, 25, I2C_MODE_STANDARD_100KHZ);
 
-  static uint8_t tx_buff[128] = {0};
-  static uint8_t rx_buff[128] = {0};
-
-  i2c_transaction_t wrong_tr = {
-    .addr = 0x7F,
-    .tx_buff = tx_buff,
-    .tx_len = 128,
-    .rx_buff = rx_buff,
-    .rx_len = 128,
-    .repeated_start = false
+  uint8_t oled_init_sequence[] = {
+    0x00, // Control byte: all next bytes will be comands
+    0xAE, // Display OFF
+    0x20, // Set Memory Addressing Mode
+    0x10, // Page Addressing Mode
+    0xB0, // Set Page Start Address
+    0x81, // Set Contrast Control
+    0xFF, // Maximum brightness
+    0xA1, // Set Segment Re-map
+    0xA6, // Normal display
+    0x8D, // Charge Pump Command
+    0x14, // Enable Charge Pump
+    0xAF  // Display ON!
   };
 
-  uint8_t oled_cmd[] = {0x00, 0xAF};
-
-  i2c_transaction_t oled_tr = {
-      .addr = 0x3C,          // Чистый 7-битный адрес!
-      .tx_buff = oled_cmd,
-      .tx_len = 2,
-      .rx_buff = NULL,
-      .rx_len = 0,
-      .repeated_start = false
+  i2c_transaction_t oled_init_tr = {
+    .addr = 0x3C,
+    .tx_buff = oled_init_sequence,
+    .tx_len = sizeof(oled_init_sequence),
+    .rx_buff = NULL,
+    .rx_len = 0,
+    .repeated_start = false,
+    .max_retries = 2
   };
 
-  //i2c_execute(&i2c1, &oled_tr);
+  // i2c_ping_device(&i2c1, 0x78);
+  // delay_ms(500);
+  // i2c_ping_device(&i2c1, 0x78);
 
 
-  
+  i2c_execute(&i2c1, &oled_init_tr);
+
+
   while(1) {
-    ping_oled();
-    delay_ms(500);
+    __NOP();
   }
-
 }
 
 /**

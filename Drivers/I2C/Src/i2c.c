@@ -76,8 +76,8 @@ i2c_status_t i2c_init(i2c_t *i2c, uint32_t pclk1_mhz, i2c_mode_t mode) {
 
 i2c_status_t i2c_execute(i2c_t *i2c, i2c_transaction_t *tr) {
     assert(i2c != NULL && tr != NULL);
-    
-    if(i2c->busy || (i2c->bus->SR2 & I2C_SR2_BUSY)) {
+    // i2c->bus->SR2 & I2C_SR2_BUSY - danger
+    if(i2c->busy) {
         return I2C_IS_BUSY;
     }
     
@@ -85,6 +85,8 @@ i2c_status_t i2c_execute(i2c_t *i2c, i2c_transaction_t *tr) {
     i2c->ctx = *tr;
     i2c->tx_cnt = 0; 
     i2c->rx_cnt = 0;
+    i2c->current_ctx = tr;
+    i2c->retry_cnt = 0;
     i2c->status = I2C_OK; 
     i2c->state = I2C_START;
 
@@ -92,6 +94,60 @@ i2c_status_t i2c_execute(i2c_t *i2c, i2c_transaction_t *tr) {
     i2c->bus->CR1 |= I2C_CR1_START;
 
     return I2C_OK;
+}
+
+bool i2c_ping_device(i2c_t *i2c, uint32_t addr) {
+    assert(i2c != NULL);
+    
+    // DISABLE INTERRUPTS for pooling
+    i2c->bus->CR2 &= ~(I2C_CR2_ITEVTEN | I2C_CR2_ITBUFEN | I2C_CR2_ITERREN);
+
+    i2c->busy = true;
+    i2c->status = I2C_IS_BUSY;
+
+
+    i2c->bus->CR1 |= I2C_CR1_START; 
+
+    uint32_t timeout = 10000;
+    while (!(i2c->bus->SR1 & I2C_SR1_SB)) {
+        if (--timeout == 0) {
+            i2c->status = I2C_TIMEOUT;
+            i2c->busy = false;
+            return false;
+        }
+    }
+
+    i2c->bus->DR = addr;
+
+    timeout = 10000;
+    while (!(i2c->bus->SR1 & I2C_SR1_ADDR)) {
+        // if NACK
+        if (i2c->bus->SR1 & I2C_SR1_AF) { 
+            i2c->bus->CR1 |= I2C_CR1_STOP;
+            // reset AF
+            i2c->bus->SR1 = (uint32_t)~I2C_SR1_AF;
+            
+            i2c->status = I2C_NACK;
+            i2c->busy = false;
+            return false;
+        }
+        
+        if (--timeout == 0) {
+            i2c->bus->CR1 |= I2C_CR1_STOP;
+            i2c->status = I2C_TIMEOUT;
+            i2c->busy = false;
+            return false;
+        }
+    }
+
+    (void)i2c->bus->SR1;
+    (void)i2c->bus->SR2;
+
+    i2c->bus->CR1 |= I2C_CR1_STOP;
+    
+    i2c->status = I2C_OK;
+    i2c->busy = false;
+    return true;
 }
 
 void I2Cx_EV_IRQ_execute(i2c_t *i2c) {
@@ -218,21 +274,33 @@ void I2C3_EV_IRQHandler(void) {
 
 void I2Cx_ER_IRQ_execute(i2c_t *i2c) {
     uint32_t sr1 = i2c->bus->SR1;
-    if(sr1 & I2C_SR1_AF) {
+
+    if (sr1 & I2C_SR1_AF) {
+        i2c->bus->SR1 = (uint32_t)~I2C_SR1_AF; // reset af
+        if(i2c->retry_cnt < i2c->current_ctx->max_retries) { // restart
+            i2c->retry_cnt++;
+            i2c->bus->CR1 |= I2C_CR1_START;
+            i2c->state = I2C_START;
+            return;
+        }
         i2c->status = I2C_NACK;
         i2c->state = I2C_ERROR;
-        i2c->bus->SR1 &= ~I2C_SR1_AF;
     }
-    else if(sr1 & I2C_SR1_BERR) {
+    else if (sr1 & I2C_SR1_BERR) {
         i2c->status = I2C_BUS_ERROR;
         i2c->state = I2C_ERROR;
-        i2c->bus->SR1 &= ~I2C_SR1_BERR;
+        i2c->bus->SR1 = (uint32_t)~I2C_SR1_BERR;
     }
+
     i2c->bus->CR1 |= I2C_CR1_STOP;
+
+    for(volatile uint32_t i = 0; i < 50; i++);
+
     i2c->bus->CR2 &= ~(I2C_CR2_ITEVTEN | I2C_CR2_ITBUFEN | I2C_CR2_ITERREN);
+    
     i2c->busy = false;
 
-    if(i2c->callback != NULL) {
+    if (i2c->callback != NULL) {
         i2c->callback(i2c->status);
     }
 }

@@ -6,7 +6,7 @@
 #include <stm32f446xx.h>
 #include <stddef.h>
 
-// status errors
+// status I2C
 typedef enum {
     I2C_OK,
     I2C_TIMEOUT,
@@ -14,7 +14,8 @@ typedef enum {
     I2C_BUS_ERROR,
     I2C_ARBITRATION_LOST,
     I2C_INVALID_ARG,
-    I2C_IS_BUSY
+    I2C_IS_BUSY,
+    I2C_QUEUE_FULL
 } i2c_status_t;
 
 // FSM for I2c
@@ -29,14 +30,15 @@ typedef enum {
     I2C_ERROR
 } i2c_state_t;
 
-// context
+// context i2c
 typedef struct {
-    uint16_t addr;
+    uint16_t addr; // addr must be 7-bit type. if you have 8bit addr you must do (adrr >> 1)
     uint8_t *tx_buff;
     size_t tx_len;
     uint8_t *rx_buff;
     size_t rx_len;
     bool repeated_start;
+    uint8_t max_retries;
 } i2c_transaction_t;
 
 
@@ -49,6 +51,8 @@ typedef struct {
     volatile i2c_state_t state;     // current state
     volatile i2c_status_t status;   // return status
     i2c_transaction_t ctx;          // current context
+    i2c_transaction_t *current_ctx; // save for retries
+    uint8_t retry_cnt;
     uint16_t tx_cnt;                // current tx index
     uint16_t rx_cnt;                // current rx index
     volatile bool busy;
@@ -68,6 +72,7 @@ typedef enum {
 i2c_status_t i2c_init(i2c_t *i2c, uint32_t pclk1_mhz, i2c_mode_t mode);
 // operations
 i2c_status_t i2c_execute(i2c_t *i2c, i2c_transaction_t *tr);
+bool i2c_ping_device(i2c_t *i2c, uint32_t addr); // addr must be 7-bit type
 void I2Cx_EV_IRQ_execute(i2c_t *i2c);
 void I2Cx_ER_IRQ_execute(i2c_t *i2c);
 #endif
