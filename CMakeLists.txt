@@ -51,6 +51,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Drivers/DataST/Src/ring_buffer.c
     Drivers/USART/Src/usart.c
     Drivers/I2C/Src/i2c.c
+    Drivers/SPI/Src/spi.c
 )
 
 # Add include paths
@@ -62,6 +63,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     Drivers/DataST/Inc
     Drivers/USART/Inc
     Drivers/I2C/Inc
+    Drivers/SPI/Inc
 )
 
 # Add project symbols (macros)

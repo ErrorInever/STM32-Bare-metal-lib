@@ -53,8 +53,8 @@ typedef struct {
     i2c_transaction_t ctx;          // current context
     i2c_transaction_t *current_ctx; // save for retries
     uint8_t retry_cnt;
-    uint16_t tx_cnt;                // current tx index
-    uint16_t rx_cnt;                // current rx index
+    volatile uint16_t tx_cnt;                // current tx index
+    volatile uint16_t rx_cnt;                // current rx index
     volatile bool busy;
     i2c_callback_t callback;
 } i2c_t;
