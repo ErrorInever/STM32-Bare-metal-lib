@@ -2,6 +2,8 @@
 #include "main.h"
 #include "cmsis_gcc.h"
 #include "gpio.h"
+#include "spi.h"
+#include "stm32_hal_legacy.h"
 #include "stm32f446xx.h"
 #include "stm32f4xx_hal_gpio.h"
 #include "systick.h"
@@ -10,84 +12,86 @@
 #include <usart.h>
 #include <stdint.h>
 #include <i2c.h>
+#include <spi.h>
 #include <stdio.h>
 
+/*
+--------SPI PINS--------
+VCC     5V
+GND
+SCK     PA5
+MISO    PA6
+MOSI    PA7
+CS      PB6
+------------------------
+*/
+
+#define CS_HIGH GPIO_BSRR_BS6   // set
+#define CS_LOW GPIO_BSRR_BR6   // reset
+
+
 void SystemClock_Config(void);
+
+
+// user callback
+
+void sd_callback(spi_t *spi, volatile spi_transaction_t *tr, spi_status_t status_tr) {
+  // CS = 1
+  if(status_tr == SPI_OK) {
+    // TODO
+  }
+}
+
+// CS global
+static const gpio_t cs = {GPIOB, 6};
+
 
 int main(void) {
   SystemClock_Config();
   systick_config_ms(100);
 
-  static const gpio_t usart2_pa2 = {GPIOA, 2};
-  static const gpio_t usart2_pa3 = {GPIOA, 3};
-
-  gpio_init(&usart2_pa2, GPIO_MODE_AF_t, GPIO_PULL_UP_t, 
-    GPIO_OTYPE_PP_t, GPIO_SPEED_HIGH_t);
-  gpio_init(&usart2_pa3, GPIO_MODE_AF_t, GPIO_PULL_UP_t, 
-    GPIO_OTYPE_PP_t, GPIO_SPEED_HIGH_t);
-
-  gpio_set_alternate_function(&usart2_pa2, 7);
-  gpio_set_alternate_function(&usart2_pa3, 7);
+  // init pins
+  static const gpio_t sck = {GPIOA, 5};
+  static const gpio_t miso = {GPIOA, 6};
+  static const gpio_t mosi = {GPIOA, 7};
   
-  usart_t usart_2 = {
-    .instance = USART2,
-    .bus_freq = 25000000
-  };
+  // AF5 , PULL UP, OPEN DRAIN, SPEED HIGH
+  gpio_init(&sck, GPIO_MODE_AF_t, GPIO_PULL_UP_t, 
+    GPIO_OTYPE_PP_t, GPIO_SPEED_VERY_HIGH_t);
+  gpio_init(&miso, GPIO_MODE_AF_t, GPIO_PULL_UP_t, 
+    GPIO_OTYPE_PP_t, GPIO_SPEED_VERY_HIGH_t);
+  gpio_init(&mosi, GPIO_MODE_AF_t, GPIO_PULL_UP_t, 
+    GPIO_OTYPE_PP_t, GPIO_SPEED_VERY_HIGH_t);
+  gpio_init(&cs, GPIO_MODE_OUTPUT_t, GPIO_PULL_UP_t, 
+    GPIO_OTYPE_PP_t, GPIO_SPEED_VERY_HIGH_t);
 
-  usart_init(&usart_2, 115200);
+  gpio_set_alternate_function(&sck, 5);
+  gpio_set_alternate_function(&miso, 5);
+  gpio_set_alternate_function(&mosi, 5);
 
-  // Init I2C
-  static const gpio_t i2c1_sda = {GPIOB, 9};
-  static const gpio_t i2c1_scl = {GPIOB, 8};
+  // spi interface
+  static spi_t spi1 = {.instance = SPI1};
 
-  gpio_init(&i2c1_sda, GPIO_MODE_AF_t, GPIO_PULL_UP_t,
-     GPIO_OTYPE_OD_t, GPIO_SPEED_HIGH_t);
-  gpio_init(&i2c1_scl, GPIO_MODE_AF_t, GPIO_PULL_UP_t,
-     GPIO_OTYPE_OD_t, GPIO_SPEED_HIGH_t);
+  spi_init(&spi1);
 
-  gpio_set_alternate_function(&i2c1_sda, 4);
-  gpio_set_alternate_function(&i2c1_scl, 4);
-
-
-  static i2c_t i2c1 = {
-    .bus = I2C1
-  };
-
+  // for test use SD card
+  // Power On Sequence: CS = 1, send 10 times 0xFF. Expected response: R1_IDLE_STATE (0x01)
   
-
-  i2c_init(&i2c1, 25, I2C_MODE_STANDARD_100KHZ);
-
-  uint8_t oled_init_sequence[] = {
-    0x00, // Control byte: all next bytes will be comands
-    0xAE, // Display OFF
-    0x20, // Set Memory Addressing Mode
-    0x10, // Page Addressing Mode
-    0xB0, // Set Page Start Address
-    0x81, // Set Contrast Control
-    0xFF, // Maximum brightness
-    0xA1, // Set Segment Re-map
-    0xA6, // Normal display
-    0x8D, // Charge Pump Command
-    0x14, // Enable Charge Pump
-    0xAF  // Display ON!
-  };
-
-  i2c_transaction_t oled_init_tr = {
-    .addr = 0x3C,
-    .tx_buff = oled_init_sequence,
-    .tx_len = sizeof(oled_init_sequence),
+  uint8_t sd_seq[10] = {0xFF};
+  spi_transaction_t power_on = {
+    .tx_buff = sd_seq,
+    .tx_len = sizeof(sd_seq),
     .rx_buff = NULL,
     .rx_len = 0,
-    .repeated_start = false,
-    .max_retries = 2
+    .callback = sd_callback
   };
 
-  // i2c_ping_device(&i2c1, 0x78);
-  // delay_ms(500);
-  // i2c_ping_device(&i2c1, 0x78);
-
-
-  i2c_execute(&i2c1, &oled_init_tr);
+  // set CS = 1
+  cs.port->BSRR = CS_HIGH;
+  // send x10 0xFF
+  spi_execute_transaction(&spi1, &power_on);
+  // get pesponse
+  while(spi1.state != SPI_READY);
 
 
   while(1) {

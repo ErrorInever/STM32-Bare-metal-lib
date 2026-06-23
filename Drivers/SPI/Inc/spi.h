@@ -4,10 +4,18 @@
 #include <stdint.h>
 #include <stm32f446xx.h>
 
+struct spi_t;
+struct spi_transaction_t;
+
+typedef struct spi_t spi_t;
+typedef struct spi_transaction_t spi_transaction_t;
+
 typedef enum {
     SPI_OK,
     SPI_BUSY,
     SPI_TR_ERROR,
+    SPI_OVR,
+    SPI_MODF
 } spi_status_t;
 
 typedef enum {
@@ -18,9 +26,10 @@ typedef enum {
     SPI_ERROR           // an error occurred
 } spi_state_t;
 
-typedef void (*spi_callback_t)(void *user_data);
+// user callback
+typedef void (*spi_callback_t)(spi_t *spi, volatile spi_transaction_t *tr, spi_status_t status_tr);
 
-typedef struct {
+typedef struct spi_transaction_t {
     const uint8_t *tx_buff;
     uint16_t tx_len;
     uint8_t *rx_buff;
@@ -28,7 +37,7 @@ typedef struct {
     spi_callback_t callback;
 } spi_transaction_t;
 
-typedef struct {
+typedef struct spi_t {
     SPI_TypeDef *instance;
     volatile spi_state_t state;
     volatile spi_transaction_t *current_transaction;
