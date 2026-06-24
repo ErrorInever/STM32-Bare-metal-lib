@@ -19,18 +19,18 @@ static void spi_enable_clock(const spi_t *spi) {
     (void)RCC->APB2ENR;
 } 
 
-spi_status_t spi_init(spi_t *spi) {
+spi_status_t spi_init(spi_t *spi, spi_baudrate_t br) {
     assert(spi != NULL);
     // RCC
     spi_enable_clock(spi);
     // reset and configure SPI
     spi->instance->CR1 = 0U;
-    spi->instance->CR1 |= (SPI_CR1_MSTR             // we are master, MSTR = 1
-                        | (1 << SPI_CR1_BR_Pos)     // freq devider by 4
-                        | SPI_CR1_CPOL              // waiting for bus at 1, CPOL = 1
-                        | SPI_CR1_CPHA              // second edge sampling, CPHA = 1
-                        | SPI_CR1_SSM               // manual control CS, SSM = 1
-                        | SPI_CR1_SSI);             // need set to 1 for manual control SSM
+    spi->instance->CR1 |= (SPI_CR1_MSTR                         // we are master, MSTR = 1
+                        | ((uint32_t)br << SPI_CR1_BR_Pos)      // freq devider
+                        // | SPI_CR1_CPOL                          // waiting for bus at 1, CPOL = 1
+                        // | SPI_CR1_CPHA                          // second edge sampling, CPHA = 1
+                        | SPI_CR1_SSM                           // manual control CS, SSM = 1
+                        | SPI_CR1_SSI);                         // need set to 1 for manual control SSM
     
 
     // ENABLE NVIC IRQs
@@ -75,8 +75,8 @@ spi_status_t spi_execute_transaction(spi_t *spi, spi_transaction_t *tr) {
     if(tr->rx_buff == NULL) { // if we send i.e. tx mode only
         spi->state = SPI_BUSY_TX;
         spi->tx_cnt = tr->tx_len;
-        spi->rx_cnt = tr->rx_len;
-        cr2mask = SPI_CR2_TXEIE;
+        spi->rx_cnt = tr->tx_len;
+        cr2mask = (SPI_CR2_TXEIE | SPI_CR2_RXNEIE | SPI_CR2_ERRIE);
     } 
     else if(tr->tx_buff == NULL) { // if we read i.e. rx mode only
         spi->state = SPI_BUSY_RX;
@@ -136,7 +136,8 @@ void SPIx_IRQHandler(spi_t *spi) {
                 *spi->p_rx_ptr = spi->instance->DR;
                 spi->p_rx_ptr++;
             } else { // if we just send (tx mode) we must read from DR
-                (void)spi->instance->DR;
+                volatile uint8_t dummy = spi->instance->DR;
+                (void)dummy;
             }
             spi->rx_cnt--;
 

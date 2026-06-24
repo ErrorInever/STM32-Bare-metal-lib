@@ -26,6 +26,17 @@ typedef enum {
     SPI_ERROR           // an error occurred
 } spi_state_t;
 
+typedef enum {
+    SPI_BAUDRATE_DIV2   = 0,
+    SPI_BAUDRATE_DIV4   = 1,
+    SPI_BAUDRATE_DIV8   = 2,
+    SPI_BAUDRATE_DIV16  = 3,
+    SPI_BAUDRATE_DIV32  = 4,
+    SPI_BAUDRATE_DIV64  = 5,
+    SPI_BAUDRATE_DIV128 = 6,
+    SPI_BAUDRATE_DIV256 = 7
+} spi_baudrate_t;
+
 // user callback
 typedef void (*spi_callback_t)(spi_t *spi, volatile spi_transaction_t *tr, spi_status_t status_tr);
 
@@ -48,7 +59,7 @@ typedef struct spi_t {
     volatile uint16_t rx_cnt;   // How many bytes are left to receive
 } spi_t;
 
-spi_status_t spi_init(spi_t *spi); 
+spi_status_t spi_init(spi_t *spi, spi_baudrate_t br); 
 spi_status_t spi_execute_transaction(spi_t *spi, spi_transaction_t *tr);
 
 #endif
