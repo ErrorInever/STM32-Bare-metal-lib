@@ -52,14 +52,22 @@ typedef struct spi_t {
     SPI_TypeDef *instance;
     volatile spi_state_t state;
     volatile spi_transaction_t *current_transaction;
-    // pointers for interrupt
+    // IRQ mode
     volatile uint8_t *p_tx_ptr;
     volatile uint8_t *p_rx_ptr;
-    volatile uint16_t tx_cnt;   // How many bytes are left to send
-    volatile uint16_t rx_cnt;   // How many bytes are left to receive
+    volatile uint16_t tx_cnt;               // How many bytes are left to send
+    volatile uint16_t rx_cnt;               // How many bytes are left to receive
+    // stateless DMA    
+    DMA_TypeDef *dma_instance;              // DMA1 or DMA2
+    DMA_Stream_TypeDef *dma_stream_tx;  
+    uint32_t dma_tx_channel;
+    DMA_Stream_TypeDef *dma_stream_rx;  
+    uint32_t dma_rx_channel;
 } spi_t;
 
 spi_status_t spi_init(spi_t *spi, spi_baudrate_t br); 
+spi_status_t spi_config_dma(spi_t *spi);
 spi_status_t spi_execute_transaction(spi_t *spi, spi_transaction_t *tr);
+spi_status_t spi_execute_transaction_dma(spi_t *spi, spi_transaction_t *tr);
 
 #endif

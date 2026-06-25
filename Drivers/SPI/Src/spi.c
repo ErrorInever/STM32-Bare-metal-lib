@@ -10,6 +10,15 @@
 
 static spi_t *spi_handler[NUM_SPI_CNT] = {NULL};
 
+// for DMA dummy
+static uint8_t dma_dummy_tx = 0xFF;
+static volatile uint8_t dma_dummy_rx;
+
+// DMA streams
+// first 8 for DMA1 (0 .. 7), next 8 for DMA2 (0 .. 7)
+static spi_t *registered_dma_tx[16] = {NULL};
+static spi_t *registered_dma_rx[16] = {NULL};
+
 
 static void spi_enable_clock(const spi_t *spi) {
     if(spi->instance == SPI1) { RCC->APB2ENR |= RCC_APB2ENR_SPI1EN; }
@@ -18,6 +27,67 @@ static void spi_enable_clock(const spi_t *spi) {
     else if((spi->instance == SPI4)) { RCC->APB2ENR |= RCC_APB2ENR_SPI4EN; }
     (void)RCC->APB2ENR;
 } 
+
+static void dma_enable_clock(DMA_TypeDef *instance) {
+    if(instance == DMA1) RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
+    else if(instance == DMA2) RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN;
+}
+
+static int get_stream_number(DMA_Stream_TypeDef *stream) {
+    if(stream == DMA1_Stream0) return 0;
+    else if(stream == DMA1_Stream1) return 1;
+    else if(stream == DMA1_Stream2) return 2;
+    else if(stream == DMA1_Stream3) return 3;
+    else if(stream == DMA1_Stream4) return 4;
+    else if(stream == DMA1_Stream5) return 5;
+    else if(stream == DMA1_Stream6) return 6;
+    else if(stream == DMA1_Stream7) return 7;
+    else if(stream == DMA2_Stream0) return 8;
+    else if(stream == DMA2_Stream1) return 9;
+    else if(stream == DMA2_Stream2) return 10;
+    else if(stream == DMA2_Stream3) return 11;
+    else if(stream == DMA2_Stream4) return 12;
+    else if(stream == DMA2_Stream5) return 13;
+    else if(stream == DMA2_Stream6) return 14;
+    else if(stream == DMA2_Stream7) return 15;
+    return -1;
+}
+
+// reset flags for stream
+static void dma_clear_all_flags(DMA_TypeDef *dma, DMA_Stream_TypeDef *stream) {
+    int stream_num = get_stream_number(stream); 
+    if (stream_num < 0) return;
+
+    int s = stream_num % 8; // get index of stream DMA (0..7)
+    uint32_t mask = 0;
+
+    // mask IRQ
+    if (s == 0 || s == 4)      mask = 0x3DU;
+    else if (s == 1 || s == 5) mask = 0x3DU << 6;
+    else if (s == 2 || s == 6) mask = 0x3DU << 16;
+    else if (s == 3 || s == 7) mask = 0x3DU << 22;
+
+    if (s < 4) {
+        dma->LIFCR = mask;
+    } else {
+        dma->HIFCR = mask;
+    }
+}
+
+// Check Transfer Complete for idx stream (0..15)
+static bool dma_is_tc_flag_set(DMA_TypeDef *dma, int stream_idx) {
+    int s = stream_idx % 8; // get index of stream DMA (0..7)
+    uint32_t sr = (s < 4) ? dma->LISR : dma->HISR;
+    uint32_t mask = 0;
+    
+    // TCIF
+    if (s == 0 || s == 4)      mask = 1U << 5;  // TCIF0 / TCIF4
+    else if (s == 1 || s == 5) mask = 1U << 11; // TCIF1 / TCIF5
+    else if (s == 2 || s == 6) mask = 1U << 21; // TCIF2 / TCIF6
+    else if (s == 3 || s == 7) mask = 1U << 27; // TCIF3 / TCIF7
+    
+    return (sr & mask) != 0;
+}
 
 spi_status_t spi_init(spi_t *spi, spi_baudrate_t br) {
     assert(spi != NULL);
@@ -96,6 +166,115 @@ spi_status_t spi_execute_transaction(spi_t *spi, spi_transaction_t *tr) {
     spi->instance->CR2 |= cr2mask;
     return SPI_OK;
 }
+
+spi_status_t spi_config_dma(spi_t *spi) {
+    assert(spi != NULL);
+    // Enable DMA RCC
+    dma_enable_clock(spi->dma_instance);
+    // disable stream for configure DMA
+    spi->dma_stream_tx->CR &= ~DMA_SxCR_EN;
+    while(spi->dma_stream_tx->CR & DMA_SxCR_EN);
+    spi->dma_stream_rx->CR &= ~DMA_SxCR_EN;
+    while(spi->dma_stream_rx->CR & DMA_SxCR_EN);
+
+    // add register idx for RX only
+    int idx_rx = get_stream_number(spi->dma_stream_rx);
+    assert(idx_rx >= 0);
+    if (idx_rx >= 0) {
+        registered_dma_rx[idx_rx] = spi;
+    }
+
+    // reset settings
+    uint32_t tx_temp_cr = spi->dma_stream_tx->CR & ~(DMA_SxCR_DIR | DMA_SxCR_MINC | DMA_SxCR_PINC 
+            | DMA_SxCR_MSIZE | DMA_SxCR_PSIZE | DMA_SxCR_CHSEL);
+    uint32_t rx_temp_cr = spi->dma_stream_rx->CR & ~(DMA_SxCR_DIR | DMA_SxCR_MINC | DMA_SxCR_PINC 
+            | DMA_SxCR_MSIZE | DMA_SxCR_PSIZE | DMA_SxCR_CHSEL);  
+            
+    // setup direction
+    tx_temp_cr |= DMA_SxCR_DIR_0; // Memory to peripheral
+    rx_temp_cr |= 0U; // peripheral to memory
+    
+    // static PAR addrs
+    spi->dma_stream_tx->PAR = (uint32_t)&spi->instance->DR;
+    spi->dma_stream_rx->PAR = (uint32_t)&spi->instance->DR;
+
+    // select channel
+    tx_temp_cr |= (spi->dma_tx_channel << DMA_SxCR_CHSEL_Pos);
+    rx_temp_cr |= (spi->dma_rx_channel << DMA_SxCR_CHSEL_Pos);
+
+    spi->dma_stream_tx->CR = tx_temp_cr;
+    spi->dma_stream_rx->CR = rx_temp_cr;
+    
+    return SPI_OK;
+}
+
+spi_status_t spi_execute_transaction_dma(spi_t *spi, spi_transaction_t *tr) {
+    assert(spi != NULL);
+    assert(tr != NULL);
+
+    if(spi->state != SPI_READY) {
+        return SPI_BUSY;
+    } 
+    // init context
+    spi->current_transaction = tr;
+    spi->state = SPI_BUSY_TX_RX; // DMA only full duplex mode
+
+    // disable stream for configure DMA
+    spi->dma_stream_tx->CR &= ~DMA_SxCR_EN;
+    while(spi->dma_stream_tx->CR & DMA_SxCR_EN);
+    spi->dma_stream_rx->CR &= ~DMA_SxCR_EN;
+    while(spi->dma_stream_rx->CR & DMA_SxCR_EN); 
+
+    // reset all irq flags
+    dma_clear_all_flags(spi->dma_instance, spi->dma_stream_tx);
+    dma_clear_all_flags(spi->dma_instance, spi->dma_stream_rx); 
+
+    // len of transaction
+    if (tr->tx_buff != NULL && tr->rx_buff != NULL) {
+        assert(tr->tx_len == tr->rx_len);
+    }
+    uint16_t total_len = (tr->tx_len > tr->rx_len) ? tr->tx_len : tr->rx_len;
+    spi->dma_stream_tx->NDTR = total_len;
+    spi->dma_stream_rx->NDTR = total_len;
+
+    // reset memory increment
+    uint32_t tx_cr = spi->dma_stream_tx->CR & ~DMA_SxCR_MINC;
+    uint32_t rx_cr = spi->dma_stream_rx->CR & ~DMA_SxCR_MINC;
+
+    // TX stream
+    if(tr->tx_buff != NULL) { // if send
+        spi->dma_stream_tx->M0AR = (uint32_t)tr->tx_buff; 
+        tx_cr |= DMA_SxCR_MINC; // increment memory (buffer) 
+    } else {  // if we only read we must to send a dummy bites
+        spi->dma_stream_tx->M0AR = (uint32_t)&dma_dummy_tx;
+        // MINC disable, DMA will cyclically read the same byte, 0xFF
+    }
+    // RX stream
+    if(tr->rx_buff != NULL) { // if read
+        spi->dma_stream_rx->M0AR = (uint32_t)tr->rx_buff;
+        rx_cr |= DMA_SxCR_MINC; // increment memory (buffer)
+    } else { // if we only send we must to read a dummy bites
+        spi->dma_stream_rx->M0AR = (uint32_t)&dma_dummy_rx;
+        // MINC disable, DMA will accumulate all incoming bytes into dummy_rx
+    }
+
+    // Update CR
+    spi->dma_stream_tx->CR = tx_cr;
+    spi->dma_stream_rx->CR = rx_cr | DMA_SxCR_TCIE; // and enable TCIE irq for RX only
+
+    // Enable DMA streams
+    spi->dma_stream_rx->CR |= DMA_SxCR_EN;
+    spi->dma_stream_tx->CR |= DMA_SxCR_EN;
+
+    // Enable errors IRQ
+    spi->instance->CR2 |= SPI_CR2_ERRIE;
+
+    // Enable DMA
+    spi->instance->CR2 |= (SPI_CR2_TXDMAEN | SPI_CR2_RXDMAEN);
+
+    return SPI_OK;
+}
+
 
 // interrupts events and errors
 void SPIx_IRQHandler(spi_t *spi) {
@@ -208,3 +387,49 @@ void SPI4_IRQHandler(void) {
     if(spi_handler[3] == NULL) return;
     SPIx_IRQHandler(spi_handler[3]);
 }
+
+static void DMAx_IRQHandler(int stream_idx) {
+    spi_t *spi = registered_dma_rx[stream_idx]; // get spi obj
+    if (spi == NULL) return;
+    
+    // check TC flag (TCIF): NDTR = 0
+    if (dma_is_tc_flag_set(spi->dma_instance, stream_idx)) {
+        // reset all flags in current stream
+        dma_clear_all_flags(spi->dma_instance, spi->dma_stream_rx);
+        dma_clear_all_flags(spi->dma_instance, spi->dma_stream_tx);
+        // disable irqs
+        spi->instance->CR2 &= ~(SPI_CR2_TXDMAEN | SPI_CR2_RXDMAEN | SPI_CR2_ERRIE);
+        // wait last bite
+        while (spi->instance->SR & SPI_SR_BSY);
+
+        if (spi->current_transaction->rx_buff == NULL) { //
+            volatile uint32_t dummy = spi->instance->DR; //
+            dummy = spi->instance->SR; // reset OVR
+            (void)dummy; //
+        }
+
+        spi->state = SPI_READY; 
+        if (spi->current_transaction && spi->current_transaction->callback) { 
+            spi->current_transaction->callback(spi, spi->current_transaction, SPI_OK);
+        }
+    }
+}
+
+
+// DMA interrupts 
+void DMA1_Stream0_IRQHandler(void) { DMAx_IRQHandler(0);}
+void DMA1_Stream1_IRQHandler(void) { DMAx_IRQHandler(1);}
+void DMA1_Stream2_IRQHandler(void) { DMAx_IRQHandler(2);}
+void DMA1_Stream3_IRQHandler(void) { DMAx_IRQHandler(3);}
+void DMA1_Stream4_IRQHandler(void) { DMAx_IRQHandler(4);}
+void DMA1_Stream5_IRQHandler(void) { DMAx_IRQHandler(5);}
+void DMA1_Stream6_IRQHandler(void) { DMAx_IRQHandler(6);}
+void DMA1_Stream7_IRQHandler(void) { DMAx_IRQHandler(7);}
+void DMA2_Stream0_IRQHandler(void) { DMAx_IRQHandler(8);}
+void DMA2_Stream1_IRQHandler(void) { DMAx_IRQHandler(9);}
+void DMA2_Stream2_IRQHandler(void) { DMAx_IRQHandler(10); }
+void DMA2_Stream3_IRQHandler(void) { DMAx_IRQHandler(11); }
+void DMA2_Stream4_IRQHandler(void) { DMAx_IRQHandler(12); }
+void DMA2_Stream5_IRQHandler(void) { DMAx_IRQHandler(13); }
+void DMA2_Stream6_IRQHandler(void) { DMAx_IRQHandler(14); }
+void DMA2_Stream7_IRQHandler(void) { DMAx_IRQHandler(15); }
