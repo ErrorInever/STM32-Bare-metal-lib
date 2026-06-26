@@ -30,6 +30,13 @@ typedef struct {
     uint32_t bus_freq;          /**< Operating bus frequency in Hz. APB2 for USART1/6; APB1 for USART2/3. */
     RingBuffer_t *rx_buffer;    /**< Reference pointer to the underlying incoming circular ring buffer structure. */
     RingBuffer_t *tx_buffer;    /**< Reference pointer to the underlying outgoing circular ring buffer structure. */
+
+    // DMA 
+    DMA_TypeDef *dma_instance;
+    DMA_Stream_TypeDef *dma_stream_tx;
+    uint32_t dma_tx_channel;
+    DMA_Stream_TypeDef *dma_stream_rx;
+    uint32_t dma_rx_channel;
 } usart_t;
 
 
@@ -82,7 +89,7 @@ void usart_printf(const usart_t *usart, const char *format, ...);
  * * @param[in] usart Pointer to a valid initialized USART context handle.
  * @return true if there is at least one byte waiting to be processed, false if empty.
  */
-bool usart_avaible(const usart_t *usart);
+bool usart_available(const usart_t *usart);
 
 
 /**
@@ -110,8 +117,10 @@ void process_simple_commands(const usart_t *usart);
  * * @param[in] instance Direct pointer targeting a valid hardware USART memory map interface register group.
  * @return Extracted raw character code byte from the lower bits of the Data Register (DR).
  */
-static inline uint8_t usart_recive_byte(const USART_TypeDef *instance) {
+static inline uint8_t usart_receive_byte(const USART_TypeDef *instance) {
     return instance->DR & 0xFF;
 }
+
+void usart2_rx_init_dma(usart_t *usart, uint32_t baudrate);
 
 #endif /* USART_H_ */

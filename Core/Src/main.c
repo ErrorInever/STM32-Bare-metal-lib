@@ -1,168 +1,46 @@
+
 #include "main.h"
 #include "cmsis_gcc.h"
 #include "gpio.h"
-#include "spi.h"
-#include "stm32_hal_legacy.h"
 #include "stm32f446xx.h"
-#include "stm32f4xx_hal_gpio.h"
 #include "systick.h"
 #include "timer.h"
 #include <string.h>
 #include <usart.h>
 #include <stdint.h>
-#include <i2c.h>
-#include <spi.h>
-#include <stdio.h>
-
-/*
---------SPI PINS--------
-VCC     5V
-GND
-SCK     PA5
-MISO    PA6
-MOSI    PA7
-CS      PB6
-------------------------
-*/
-
-#define CS_HIGH GPIO_BSRR_BS6   // set
-#define CS_LOW GPIO_BSRR_BR6   // reset
-
 
 void SystemClock_Config(void);
 
-
-// user callback
-
-void sd_callback(spi_t *spi, volatile spi_transaction_t *tr, spi_status_t status_tr) {
-  // CS = 1
-  if(status_tr == SPI_OK) {
-    // TODO
-  }
-}
-
-
-
-uint8_t tx_cmd0[16] = {
-    0x40,                    // CMD0 (0x40 + 0)
-    0x00, 0x00, 0x00, 0x00,  // Argument: 0
-    0x95,                    // CRC 
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
-};
-
-uint8_t rx_buf[16] = {0}; 
-
-volatile bool tr_ready = false;
-
-void cmd0_callback(spi_t *spi, volatile spi_transaction_t *tr, spi_status_t status_tr) {
-    tr_ready = true;
-}
-
-// CS global
-static const gpio_t cs = {GPIOB, 6};
 
 int main(void) {
   SystemClock_Config();
   systick_config_ms(100);
 
-  // init pins
-  static const gpio_t sck = {GPIOA, 5};
-  static const gpio_t miso = {GPIOA, 6};
-  static const gpio_t mosi = {GPIOA, 7};
-  // AF5 , PULL UP, PP, SPEED HIGH
-  gpio_init(&sck, GPIO_MODE_AF_t, GPIO_PULL_UP_t, 
-    GPIO_OTYPE_PP_t, GPIO_SPEED_VERY_HIGH_t);
-  gpio_init(&miso, GPIO_MODE_AF_t, GPIO_PULL_UP_t, 
-    GPIO_OTYPE_PP_t, GPIO_SPEED_VERY_HIGH_t);
-  gpio_init(&mosi, GPIO_MODE_AF_t, GPIO_PULL_UP_t, 
-    GPIO_OTYPE_PP_t, GPIO_SPEED_VERY_HIGH_t);
-  gpio_init(&cs, GPIO_MODE_OUTPUT_t, GPIO_PULL_UP_t, 
-    GPIO_OTYPE_PP_t, GPIO_SPEED_VERY_HIGH_t);
-
-  gpio_set_alternate_function(&sck, 5);
-  gpio_set_alternate_function(&miso, 5);
-  gpio_set_alternate_function(&mosi, 5);
-  
-  // UART
   static const gpio_t usart2_pa2 = {GPIOA, 2};
   static const gpio_t usart2_pa3 = {GPIOA, 3};
+
   gpio_init(&usart2_pa2, GPIO_MODE_AF_t, GPIO_PULL_UP_t, 
     GPIO_OTYPE_PP_t, GPIO_SPEED_HIGH_t);
   gpio_init(&usart2_pa3, GPIO_MODE_AF_t, GPIO_PULL_UP_t, 
     GPIO_OTYPE_PP_t, GPIO_SPEED_HIGH_t);
+
   gpio_set_alternate_function(&usart2_pa2, 7);
   gpio_set_alternate_function(&usart2_pa3, 7);
-
+  
   usart_t usart_2 = {
     .instance = USART2,
     .bus_freq = 25000000
   };
-  usart_init(&usart_2, 115200);
+  //usart_init(&usart_2, 115200);
+  usart2_rx_init_dma(&usart_2, 115200);
 
-
-  // INIT SPI
-  static spi_t spi1 = {
-    .instance = SPI1, 
-    .dma_instance = DMA2,
-    .dma_stream_tx = DMA2_Stream3, 
-    .dma_tx_channel = 3,
-    .dma_stream_rx = DMA2_Stream0,
-    .dma_rx_channel = 3
-  };
-  // For init SD need 100–400kgz
-  spi_init(&spi1, SPI_BAUDRATE_DIV128);
-  spi_config_dma(&spi1);
-
-  // for test use SD card
-  // Power On Sequence: CS = 1, send 10 times 0xFF. Expected response: R1_IDLE_STATE (0x01)
   
-  uint8_t sd_seq[10] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-  spi_transaction_t power_on = {
-    .tx_buff = sd_seq,
-    .tx_len = sizeof(sd_seq),
-    .rx_buff = NULL,
-    .rx_len = 0,
-    .callback = sd_callback
-  };
-
-  spi_transaction_t cmd0_trans = {
-          .tx_buff = tx_cmd0,
-          .rx_buff = rx_buf,
-          .tx_len = 16,
-          .rx_len = 16,
-          .callback = cmd0_callback
-  };
-  cs.port->BSRR = CS_HIGH;
-  spi_execute_transaction_dma(&spi1, &power_on);
-  while(spi1.state != SPI_READY);
-  delay_ms(1);
-
-  cs.port->BSRR = CS_LOW;
-  delay_ms(1); 
-  tr_ready = false;
-  spi_execute_transaction_dma(&spi1, &cmd0_trans);
-  while(!tr_ready) {
-      __WFI();
-  }
-  cs.port->BSRR = CS_HIGH;
-  
-  uint8_t response = 0xFF;
-  for(int i = 6; i < 16; i++) {
-      if(rx_buf[i] != 0xFF) { 
-          response = rx_buf[i];
-          break;
-      }
-  }
-  if(response == 0x01) {
-    usart_printf(&usart_2, "Response OK: 0x01\n");
-  } else {
-    usart_printf(&usart_2, "Response Error\n");
-  }
-
   while(1) {
     __NOP();
   }
+
 }
+
 
 /**
   * @brief System Clock Configuration

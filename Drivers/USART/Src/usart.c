@@ -1,5 +1,6 @@
 #include "usart.h"
 #include "stm32f446xx.h"
+#include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -11,6 +12,12 @@
 
 // Size of ringbuffer: must be a power of two
 #define RING_BUF_SIZE 128
+#define RING_BUF_DMA_SIZE_TX 128
+#define RING_BUF_DMA_SIZE_RX 512
+
+#define NUM_USART 4
+// Usart hanlder
+static usart_t *usart_handler[NUM_USART] = {NULL};
 
 static uint8_t rx_storage[4][RING_BUF_SIZE];    // ringbuffer recive storage
 static RingBuffer_t rx_handler[4];              // ringbuffer recive struct
@@ -18,6 +25,11 @@ static RingBuffer_t rx_handler[4];              // ringbuffer recive struct
 static uint8_t tx_storage[4][RING_BUF_SIZE];    // ringbuffer recive storage
 static RingBuffer_t tx_handler[4];              // ringbuffer recive struct
 
+// DMA storage
+static uint8_t dma_tx_storage[RING_BUF_DMA_SIZE_TX];
+static uint8_t dma_rx_storage[RING_BUF_DMA_SIZE_RX];
+static RingBuffer_t tx_handler_circular;
+static RingBuffer_t rx_handler_circular;
 
 static uint8_t get_usart_index(const USART_TypeDef *usart) {
     if(usart == USART1) { return 0; }
@@ -68,6 +80,67 @@ void usart_init(usart_t *usart, uint32_t baudrate) {
     else if(usart->instance == USART6) {NVIC_EnableIRQ(USART6_IRQn); }
 }
 
+void usart2_rx_init_dma(usart_t *usart, uint32_t baudrate) {
+    assert(usart->instance != NULL);
+    assert(usart->instance == USART2);
+    usart_handler[1] = usart;
+    // Configure DMA
+    // RCC DMA1 & USART
+    RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
+    usart_enable_clock(usart->instance);
+    (void)RCC->AHB1ENR;
+    // Disable streams
+    usart->dma_stream_rx->CR &= ~DMA_SxCR_EN;
+    while(usart->dma_stream_rx->CR & DMA_SxCR_EN);
+    // setup USART BR
+    usart->baudrate = baudrate;
+    uint32_t div = (usart->bus_freq + baudrate / 2) / baudrate;        
+    usart->instance->BRR = div;
+    // reset flags
+    uint32_t rx_temp_cr = usart->dma_stream_rx->CR & ~(DMA_SxCR_DIR | DMA_SxCR_MINC | DMA_SxCR_PINC 
+            | DMA_SxCR_MSIZE | DMA_SxCR_PSIZE | DMA_SxCR_CHSEL); 
+
+    if (usart->dma_stream_rx == DMA1_Stream2) {
+        DMA1->LIFCR = (0x3F << 16);
+    } else if (usart->dma_stream_rx == DMA1_Stream5) {
+        DMA1->HIFCR = (0x3F << 6);
+    }
+
+    // init rx buffer
+    ring_buffer_init(&rx_handler_circular, dma_rx_storage, 
+        RING_BUF_DMA_SIZE_RX, sizeof(uint8_t));
+    usart->rx_buffer = &rx_handler_circular;
+    // configure addresses
+    usart->dma_stream_rx->PAR = (uint32_t)&usart->instance->DR; // from Data register
+    usart->dma_stream_rx->M0AR = (uint32_t)dma_rx_storage;    // to ring buffer
+    usart->dma_stream_rx->NDTR = RING_BUF_DMA_SIZE_RX;
+
+    // configure DMA CR
+    rx_temp_cr |= ((uint32_t)usart->dma_rx_channel << DMA_SxCR_CHSEL_Pos); // select channel
+    rx_temp_cr |= DMA_SxCR_MINC;                                        // enable memory increment
+    rx_temp_cr &= ~DMA_SxCR_PINC;                                       // disable peripheral increment
+    rx_temp_cr &= ~DMA_SxCR_DIR;                                        // direction peripheral to memory
+    rx_temp_cr |= DMA_SxCR_CIRC;                                        // enable circular mode
+
+    // configure USART
+    usart->instance->CR1 |= USART_CR1_TE | 
+                            USART_CR1_RE | 
+                            USART_CR1_IDLEIE | 
+                            USART_CR1_UE;
+    
+    usart->dma_stream_rx->CR = rx_temp_cr;
+
+    // enable stream in DMA
+    usart->dma_stream_rx->CR |= DMA_SxCR_EN;
+    // disable interrupts rxne
+    usart->instance->CR1 &= ~USART_CR1_RXNEIE;
+    // enable DMA in USART and irq IDLE line detection
+    usart->instance->CR3 |= USART_CR3_DMAR;
+    usart->instance->CR1 |= USART_CR1_IDLEIE;
+    // enable irq in NVIC
+    NVIC_EnableIRQ(USART2_IRQn);
+}
+
 void usart_send(const usart_t *usart, const char *str) {
     uint8_t idx = get_usart_index(usart->instance);
     ENTER_CRITICAL();
@@ -80,7 +153,7 @@ void usart_send(const usart_t *usart, const char *str) {
     EXIT_CRITICAL();
 }
 
-bool usart_avaible(const usart_t *usart) {
+bool usart_available(const usart_t *usart) {
     return !is_empty(usart->rx_buffer);
 }
 
@@ -134,20 +207,38 @@ void process_simple_commands(const usart_t *usart) {
 }
 
 static void generic_usart_irq_handler(USART_TypeDef *instance, uint8_t idx) {
+    uint32_t sr = instance->SR;
+    uint32_t cr1 = instance->CR1;
+
+    // DMA
+    // IDLE line detection
+    if ((sr & USART_SR_IDLE) && (cr1 & USART_CR1_IDLEIE)) {
+        usart_t *usart = usart_handler[idx];
+        // reset IDLE flag
+        volatile uint32_t dummy = USART2->SR;
+        dummy = USART2->DR;
+        (void)dummy;
+
+        uint16_t dma_head = RING_BUF_DMA_SIZE_RX - usart->dma_stream_rx->NDTR;
+        usart->rx_buffer->head = dma_head;
+        
+    }
     // error flags
-    if(instance->SR & (USART_SR_ORE | USART_SR_NE | USART_SR_FE | USART_SR_PE)) {
+    if(sr & (USART_SR_ORE | USART_SR_NE | USART_SR_FE | USART_SR_PE)) {
         volatile uint32_t dummy;
         dummy = instance->SR;       // read SR
         dummy = instance->DR;       // read DR (reset error flags)
         (void)dummy;
     }
+
+    // Interrupts
     // If data is ready to read i.e. RXNE = 1 AND RXNEIE (Enabled interrupt)
-    if ((instance->SR & USART_SR_RXNE) && (instance->CR1 & USART_CR1_RXNEIE)) {
-        uint8_t received_byte = usart_recive_byte(instance);
+    if ((sr & USART_SR_RXNE) && (cr1 & USART_CR1_RXNEIE)) {
+        uint8_t received_byte = usart_receive_byte(instance);
         // TODO add overflow lost data printf
         ring_buffer_push(&rx_handler[idx], &received_byte);
     // If DR register is empty i.e. TXE = 1 AND TXEIE
-    } else if((instance->SR & USART_SR_TXE) && (instance->CR1 & USART_CR1_TXEIE)) {
+    } else if((sr & USART_SR_TXE) && (cr1 & USART_CR1_TXEIE)) {
         // send byte
         uint8_t out_data;
         if(ring_buffer_pop(&tx_handler[idx], &out_data)) {

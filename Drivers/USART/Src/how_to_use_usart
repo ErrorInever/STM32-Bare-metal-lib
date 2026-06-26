@@ -26,16 +26,16 @@ int main(void) {
   gpio_set_alternate_function(&usart2_pa2, 7);
   gpio_set_alternate_function(&usart2_pa3, 7);
   
-  usart_t usart_1 = {
+  usart_t usart_2 = {
     .instance = USART2,
     .bus_freq = 25000000
   };
 
-  usart_init(&usart_1, 115200);
+  usart_init(&usart_2, 115200);
 
   
   while(1) {
-    process_simple_commands(&usart_1);
+    process_simple_commands(&usart_2);
   }
 
 }
