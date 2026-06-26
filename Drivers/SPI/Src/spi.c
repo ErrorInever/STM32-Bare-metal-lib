@@ -20,6 +20,14 @@ static spi_t *registered_dma_tx[16] = {NULL};
 static spi_t *registered_dma_rx[16] = {NULL};
 
 
+static const IRQn_Type dma_irqn_map[16] = {
+    DMA1_Stream0_IRQn, DMA1_Stream1_IRQn, DMA1_Stream2_IRQn, DMA1_Stream3_IRQn,
+    DMA1_Stream4_IRQn, DMA1_Stream5_IRQn, DMA1_Stream6_IRQn, DMA1_Stream7_IRQn,
+    DMA2_Stream0_IRQn, DMA2_Stream1_IRQn, DMA2_Stream2_IRQn, DMA2_Stream3_IRQn,
+    DMA2_Stream4_IRQn, DMA2_Stream5_IRQn, DMA2_Stream6_IRQn, DMA2_Stream7_IRQn
+};
+
+
 static void spi_enable_clock(const spi_t *spi) {
     if(spi->instance == SPI1) { RCC->APB2ENR |= RCC_APB2ENR_SPI1EN; }
     else if(spi->instance == SPI2) { RCC->APB1ENR |= RCC_APB1ENR_SPI2EN; }
@@ -183,6 +191,9 @@ spi_status_t spi_config_dma(spi_t *spi) {
     if (idx_rx >= 0) {
         registered_dma_rx[idx_rx] = spi;
     }
+    NVIC_EnableIRQ(dma_irqn_map[idx_rx]);
+    NVIC_SetPriority(dma_irqn_map[idx_rx], 5);
+
 
     // reset settings
     uint32_t tx_temp_cr = spi->dma_stream_tx->CR & ~(DMA_SxCR_DIR | DMA_SxCR_MINC | DMA_SxCR_PINC 
