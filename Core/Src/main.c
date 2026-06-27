@@ -45,6 +45,10 @@ int main(void) {
   //usart_init(&usart_2, 115200);
   usart2_rx_init_dma(&usart_2, 115200);
 
+  // send
+  uint8_t data = 155;
+  usart2_send_dma(&usart_2, &data, sizeof(data));
+
   
   while(1) {
     __NOP();

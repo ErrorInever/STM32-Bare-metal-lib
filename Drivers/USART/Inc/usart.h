@@ -130,4 +130,6 @@ static inline uint8_t usart_receive_byte(const USART_TypeDef *instance) {
 
 void usart2_rx_init_dma(usart_t *usart, uint32_t baudrate);
 
+void usart2_send_dma(usart_t *usart, const uint8_t *data, uint16_t size);
+
 #endif /* USART_H_ */

@@ -28,10 +28,10 @@ static RingBuffer_t tx_handler[4];              // ringbuffer recive struct
 // DMA storage
 //static uint8_t dma_tx_storage[RING_BUF_DMA_SIZE_TX];
 static uint8_t dma_rx_storage[RING_BUF_DMA_SIZE_RX];
-static uint8_t dma_tx_storage[RING_BUF_DMA_SIZE_TX];
+
 //static RingBuffer_t tx_handler_circular;
 static RingBuffer_t rx_handler_circular;
-static RingBuffer_t tx_handler_dma;
+
 
 static uint8_t get_usart_index(const USART_TypeDef *usart) {
     if(usart == USART1) { return 0; }
@@ -223,6 +223,41 @@ void process_simple_commands(const usart_t *usart) {
     }
 }
 
+void usart2_send_dma(usart_t *usart, const uint8_t *data, uint16_t size) {
+    // wait previous transmitt is ready
+    while (usart->dma_stream_tx->CR & DMA_SxCR_EN);
+    assert(usart->instance != NULL);
+    assert(usart->instance == USART2);
+
+    // Init instance
+    usart->dma_instance = DMA1;
+    usart->dma_stream_tx = DMA1_Stream6;
+    usart->dma_tx_channel = 4U;
+
+    // reset flags
+    DMA1->HIFCR = 0x00FC0000U;
+
+    // configure addresses
+    usart->dma_stream_tx->PAR  = (uint32_t)&usart->instance->DR; // to peripheral
+    usart->dma_stream_tx->M0AR = (uint32_t)data;                // from memory
+    usart->dma_stream_tx->NDTR = size;                          // size
+
+    // CR configure
+    uint32_t cr = 0;
+    cr |= ((uint32_t)usart->dma_tx_channel << DMA_SxCR_CHSEL_Pos); // select channel 4
+    cr |= DMA_SxCR_MINC;                                       // increment memory
+    cr |= DMA_SxCR_DIR_0;                                      // direction M2P 
+    cr &= ~DMA_SxCR_CIRC;                                      // mode NORMAL
+    cr |= DMA_SxCR_TCIE;                                       // enable interrupt Transmit complete
+    usart->dma_stream_tx->CR = cr;
+
+    // enable irq in DMA
+    usart->instance->CR3 |= USART_CR3_DMAT;
+    NVIC_EnableIRQ(DMA1_Stream6_IRQn);
+    usart->dma_stream_tx->CR |= DMA_SxCR_EN;
+}
+
+
 static void generic_usart_irq_handler(USART_TypeDef *instance, uint8_t idx) {
     uint32_t sr = instance->SR;
     uint32_t cr1 = instance->CR1;
@@ -285,6 +320,18 @@ static void generic_usart_irq_handler(USART_TypeDef *instance, uint8_t idx) {
         } else {
             instance->CR1 &= ~USART_CR1_TXEIE; // buffer is empty, reset TXEIE flag
         }
+    }
+}
+
+// DMA TX interrupt
+
+void DMA1_Stream6_IRQHandler(void) {
+    // check flag TCIF6
+    if(DMA1->HISR & DMA_HISR_TCIF6) {
+        // reset flag
+        DMA1->HIFCR = DMA_HIFCR_CTCIF6;
+        // disable irq in DMA
+        usart_handler[1]->instance->CR3 &= ~USART_CR3_DMAT;
     }
 }
 
