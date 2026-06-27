@@ -434,7 +434,7 @@ void DMA1_Stream2_IRQHandler(void) { DMAx_IRQHandler(2);}
 void DMA1_Stream3_IRQHandler(void) { DMAx_IRQHandler(3);}
 void DMA1_Stream4_IRQHandler(void) { DMAx_IRQHandler(4);}
 void DMA1_Stream5_IRQHandler(void) { DMAx_IRQHandler(5);}
-void DMA1_Stream6_IRQHandler(void) { DMAx_IRQHandler(6);}
+// void DMA1_Stream6_IRQHandler(void) { DMAx_IRQHandler(6);} // reserved for USART TX
 void DMA1_Stream7_IRQHandler(void) { DMAx_IRQHandler(7);}
 void DMA2_Stream0_IRQHandler(void) { DMAx_IRQHandler(8);}
 void DMA2_Stream1_IRQHandler(void) { DMAx_IRQHandler(9);}
