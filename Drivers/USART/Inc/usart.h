@@ -19,12 +19,17 @@
 #include <assert.h>
 #include <stdbool.h>
 
+struct usart_t;
+typedef struct usart_t usart_t;
+
+// user callback
+typedef void (*usart_callback_t)(usart_t *usart, uint16_t size);
 
 /**
  * @struct usart_t
  * @brief Handle structure representing a fully configured USART peripheral instanced entity.
  */
-typedef struct {
+typedef struct usart_t {
     USART_TypeDef *instance;    /**< Pointer to hardware peripheral registers (USART1, USART2, USART3, USART6). */
     uint32_t baudrate;          /**< Desired transmission speed rate (e.g., 9600, 115200). */
     uint32_t bus_freq;          /**< Operating bus frequency in Hz. APB2 for USART1/6; APB1 for USART2/3. */
@@ -37,6 +42,8 @@ typedef struct {
     uint32_t dma_tx_channel;
     DMA_Stream_TypeDef *dma_stream_rx;
     uint32_t dma_rx_channel;
+    uint8_t dma_rx_tail;
+    usart_callback_t callback;  //**< User callback */
 } usart_t;
 
 

@@ -9,7 +9,17 @@
 #include <usart.h>
 #include <stdint.h>
 
+
 void SystemClock_Config(void);
+
+void read_buff(usart_t *usart, uint16_t size) {
+  char ch = 0;
+  usart_printf(usart, "Ring buffer: ");
+  for(int i = 0; i < size; i++) {
+    ring_buffer_pop(usart->rx_buffer, &ch);
+    usart_printf(usart, "%c ", ch);
+  }
+}
 
 
 int main(void) {
@@ -29,7 +39,8 @@ int main(void) {
   
   usart_t usart_2 = {
     .instance = USART2,
-    .bus_freq = 25000000
+    .bus_freq = 25000000,
+    .callback = read_buff
   };
   //usart_init(&usart_2, 115200);
   usart2_rx_init_dma(&usart_2, 115200);
