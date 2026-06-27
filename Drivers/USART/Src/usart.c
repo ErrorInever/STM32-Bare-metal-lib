@@ -249,6 +249,7 @@ void usart2_send_dma(usart_t *usart, const uint8_t *data, uint16_t size) {
     cr |= DMA_SxCR_DIR_0;                                      // direction M2P 
     cr &= ~DMA_SxCR_CIRC;                                      // mode NORMAL
     cr |= DMA_SxCR_TCIE;                                       // enable interrupt Transmit complete
+    cr |= DMA_SxCR_TCIE | DMA_SxCR_TEIE;                       // enable interrupt Transport error
     usart->dma_stream_tx->CR = cr;
 
     // enable irq in DMA
@@ -332,6 +333,11 @@ void DMA1_Stream6_IRQHandler(void) {
         DMA1->HIFCR = DMA_HIFCR_CTCIF6;
         // disable irq in DMA
         usart_handler[1]->instance->CR3 &= ~USART_CR3_DMAT;
+    } else if(DMA1->HISR & DMA_HISR_TEIF6) {
+        // reset error flag
+        DMA1->HIFCR = DMA_HIFCR_CTEIF6;
+        // disable DMA in UART2
+        USART2->CR3 &= ~USART_CR3_DMAT;
     }
 }
 
