@@ -52,6 +52,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Drivers/USART/Src/usart.c
     Drivers/I2C/Src/i2c.c
     Drivers/SPI/Src/spi.c
+    Drivers/ADC_DAC/Src/ADC.c
 )
 
 # Add include paths
@@ -64,6 +65,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     Drivers/USART/Inc
     Drivers/I2C/Inc
     Drivers/SPI/Inc
+    Drivers/ADC_DAC/Inc
 )
 
 # Add project symbols (macros)
