@@ -401,26 +401,26 @@ void SPI4_IRQHandler(void) {
 
 static void DMAx_IRQHandler(int stream_idx) {
     spi_t *spi = registered_dma_rx[stream_idx]; // get spi obj
-    if (spi == NULL) return;
+    if(spi == NULL) return;
     
     // check TC flag (TCIF): NDTR = 0
-    if (dma_is_tc_flag_set(spi->dma_instance, stream_idx)) {
+    if(dma_is_tc_flag_set(spi->dma_instance, stream_idx)) {
         // reset all flags in current stream
         dma_clear_all_flags(spi->dma_instance, spi->dma_stream_rx);
         dma_clear_all_flags(spi->dma_instance, spi->dma_stream_tx);
         // disable irqs
         spi->instance->CR2 &= ~(SPI_CR2_TXDMAEN | SPI_CR2_RXDMAEN | SPI_CR2_ERRIE);
         // wait last bite
-        while (spi->instance->SR & SPI_SR_BSY);
+        while(spi->instance->SR & SPI_SR_BSY);
 
-        if (spi->current_transaction->rx_buff == NULL) { //
+        if(spi->current_transaction->rx_buff == NULL) { //
             volatile uint32_t dummy = spi->instance->DR; //
             dummy = spi->instance->SR; // reset OVR
             (void)dummy; //
         }
 
         spi->state = SPI_READY; 
-        if (spi->current_transaction && spi->current_transaction->callback) { 
+        if(spi->current_transaction && spi->current_transaction->callback) { 
             spi->current_transaction->callback(spi, spi->current_transaction, SPI_OK);
         }
     }
@@ -434,13 +434,13 @@ void DMA1_Stream2_IRQHandler(void) { DMAx_IRQHandler(2);}
 void DMA1_Stream3_IRQHandler(void) { DMAx_IRQHandler(3);}
 void DMA1_Stream4_IRQHandler(void) { DMAx_IRQHandler(4);}
 void DMA1_Stream5_IRQHandler(void) { DMAx_IRQHandler(5);}
-// void DMA1_Stream6_IRQHandler(void) { DMAx_IRQHandler(6);} // reserved for USART TX
+// void DMA1_Stream6_IRQHandler(void) { DMAx_IRQHandler(6);}               // reserved for USART2
 void DMA1_Stream7_IRQHandler(void) { DMAx_IRQHandler(7);}
 void DMA2_Stream0_IRQHandler(void) { DMAx_IRQHandler(8);}
-void DMA2_Stream1_IRQHandler(void) { DMAx_IRQHandler(9);}
-void DMA2_Stream2_IRQHandler(void) { DMAx_IRQHandler(10); }
+// void DMA2_Stream1_IRQHandler(void) { DMAx_IRQHandler(9);}               // reserved for ADC3  
+// void DMA2_Stream2_IRQHandler(void) { DMAx_IRQHandler(10); }             // reserved for ADC2
 void DMA2_Stream3_IRQHandler(void) { DMAx_IRQHandler(11); }
-void DMA2_Stream4_IRQHandler(void) { DMAx_IRQHandler(12); }
+// void DMA2_Stream4_IRQHandler(void) { DMAx_IRQHandler(12); }             // reserved for ADC1
 void DMA2_Stream5_IRQHandler(void) { DMAx_IRQHandler(13); }
 void DMA2_Stream6_IRQHandler(void) { DMAx_IRQHandler(14); }
 void DMA2_Stream7_IRQHandler(void) { DMAx_IRQHandler(15); }
