@@ -130,6 +130,9 @@ void adc_init(adc_t *adc, adc_mode_t mode) {
     // setup resolution
     adc->instance->CR1 &= ~ADC_CR1_RES; // max resolution 12 bit (00)
 
+    // allow innner channels (for TEST)
+    ADC->CCR |= ADC_CCR_TSVREFE;
+
     // setup queue
     adc_configure_queue_simple(adc, adc->sample_time);
 

@@ -1,8 +1,10 @@
 
 #include "main.h"
+#include "ADC.h"
 #include "cmsis_gcc.h"
 #include "gpio.h"
 #include "stm32f446xx.h"
+#include "stm32f4xx_hal_gpio.h"
 #include "systick.h"
 #include "timer.h"
 #include <string.h>
@@ -12,15 +14,24 @@
 
 void SystemClock_Config(void);
 
-void read_buff(usart_t *usart, uint16_t size) {
-  char ch = 0;
-  usart_printf(usart, "Ring buffer: ");
-  for(int i = 0; i < size; i++) {
-    ring_buffer_pop(usart->rx_buffer, &ch);
-    usart_printf(usart, "%c ", ch);
-  }
-}
 
+// buffer for channel
+uint16_t adc_vref_buffer[1] = {0};
+
+// for live watch
+volatile uint16_t vref_raw_value = 0;
+volatile uint32_t test_counter = 0;
+
+// channel
+adc_channel_config_t vref_channel[] = {
+  { .channel_number = 17, .sampling_time = 3 } 
+};
+
+
+void adc_test_callback(adc_t *adc) {
+  test_counter++;
+  vref_raw_value = adc_vref_buffer[0];
+}
 
 int main(void) {
   SystemClock_Config();
@@ -39,19 +50,26 @@ int main(void) {
   
   usart_t usart_2 = {
     .instance = USART2,
-    .bus_freq = 25000000,
-    .callback = read_buff
+    .bus_freq = 25000000
   };
   //usart_init(&usart_2, 115200);
-  usart2_rx_init_dma(&usart_2, 115200);
+  usart_init(&usart_2, 115200);
 
-  // send
-  uint8_t data = 155;
-  usart2_send_dma(&usart_2, &data, sizeof(data));
+  // ADC
+  adc_t test_adc = {
+    .instance = ADC1,
+    .adc_channels = vref_channel,
+    .num_channels = 1,
+    .data_buffer = adc_vref_buffer,
+    .callback = adc_test_callback
+  };
 
-  
+  adc_init(&test_adc, CONTINUOUS);
+
   while(1) {
     __NOP();
+    usart_printf(&usart_2, "Raw number: %d\n", vref_raw_value);
+    delay_ms(300);
   }
 
 }
