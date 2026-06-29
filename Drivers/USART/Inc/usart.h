@@ -128,8 +128,36 @@ static inline uint8_t usart_receive_byte(const USART_TypeDef *instance) {
     return instance->DR & 0xFF;
 }
 
+/* ========================================================================== */
+/* DMA & Advanced Interface                                                   */
+/* ========================================================================== */
+
+/**
+ * @brief Initializes USART2 in Receive mode using DMA with IDLE line detection.
+ * * Configures DMA1 Stream 5 (Channel 4) to operate in circular mode, automatically 
+ * routing incoming characters from the USART2 Data Register (DR) into an internal 
+ * static circular buffer (`dma_rx_storage`). It disables the standard RXNE interrupt 
+ * and instead enables the hardware IDLE line interrupt (`IDLEIE`). When an idle condition 
+ * occurs on the bus, the ISR calculates the payload size, flushes data to the active 
+ * ring buffer, and triggers the user completion callback.
+ * * @pre The core peripheral pointer `instance` inside the handle must target USART2.
+ * * @param[in,out] usart    Pointer to user-allocated USART context handle structure.
+ * @param[in]     baudrate Expected operation transmission speeds (bps).
+ */
 void usart2_rx_init_dma(usart_t *usart, uint32_t baudrate);
 
+/**
+ * @brief Transmits a static block of data asynchronously via DMA channels.
+ * * Blocks safely until any ongoing DMA stream transmission drops its active flag. 
+ * Then, configures DMA1 Stream 6 (Channel 4) to run in Memory-to-Peripheral (M2P) 
+ * Normal mode, mapping the input source address directly to the hardware data bus. 
+ * Enables Transfer Complete (`TCIE`) and Transfer Error (`TEIE`) interrupts at the 
+ * DMA level before triggering the serial transmission stream.
+ * * @pre The core peripheral pointer `instance` inside the handle must target USART2.
+ * * @param[in,out] usart Pointer to a valid initialized USART context handle.
+ * @param[in]     data  Pointer to the contiguous raw byte array to transfer.
+ * @param[in]     size  Total allocation block byte count to process.
+ */
 void usart2_send_dma(usart_t *usart, const uint8_t *data, uint16_t size);
 
 #endif /* USART_H_ */
