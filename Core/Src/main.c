@@ -1,80 +1,17 @@
 
 #include "main.h"
-#include "ADC.h"
-#include "cmsis_gcc.h"
-#include "gpio.h"
 #include "stm32f446xx.h"
-#include "stm32f4xx_hal_gpio.h"
-#include "systick.h"
-#include "timer.h"
-#include <string.h>
-#include <usart.h>
-#include <stdint.h>
 
 
 void SystemClock_Config(void);
 
 
-// buffer for channel
-uint16_t adc_vref_buffer[1] = {0};
-
-// for live watch
-volatile uint16_t vref_raw_value = 0;
-volatile uint32_t test_counter = 0;
-
-// channel
-adc_channel_config_t vref_channel[] = {
-  { .channel_number = 17, .sampling_time = 3 } 
-};
-
-
-void adc_test_callback(adc_t *adc) {
-  test_counter++;
-  vref_raw_value = adc_vref_buffer[0];
-}
 
 int main(void) {
   SystemClock_Config();
-  systick_config_ms(100);
-
-  static const gpio_t usart2_pa2 = {GPIOA, 2};
-  static const gpio_t usart2_pa3 = {GPIOA, 3};
-
-  gpio_init(&usart2_pa2, GPIO_MODE_AF_t, GPIO_PULL_UP_t, 
-    GPIO_OTYPE_PP_t, GPIO_SPEED_HIGH_t);
-  gpio_init(&usart2_pa3, GPIO_MODE_AF_t, GPIO_PULL_UP_t, 
-    GPIO_OTYPE_PP_t, GPIO_SPEED_HIGH_t);
-
-  gpio_set_alternate_function(&usart2_pa2, 7);
-  gpio_set_alternate_function(&usart2_pa3, 7);
-  
-  usart_t usart_2 = {
-    .instance = USART2,
-    .bus_freq = 25000000
-  };
-  //usart_init(&usart_2, 115200);
-  usart_init(&usart_2, 115200);
-
-  // ADC
-  adc_t test_adc = {
-    .instance = ADC1,
-    .adc_channels = vref_channel,
-    .num_channels = 1,
-    .data_buffer = adc_vref_buffer,
-    .callback = adc_test_callback
-  };
-
-  adc_init(&test_adc, CONTINUOUS);
-
   while(1) {
-    __NOP();
-    usart_printf(&usart_2, "Raw number: %d\n", vref_raw_value);
-    delay_ms(300);
   }
-
 }
-
-
 /**
   * @brief System Clock Configuration
   * @retval None
