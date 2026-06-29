@@ -53,6 +53,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Drivers/I2C/Src/i2c.c
     Drivers/SPI/Src/spi.c
     Drivers/ADC_DAC/Src/ADC.c
+    Drivers/ADC_DAC/Src/DAC.c
 )
 
 # Add include paths
