@@ -12,14 +12,14 @@ Through practical examples, this library demonstrates how to build clean code ar
 ## Key Features & Architectural Highlights
 
 * **Architecture:** Strict object-oriented design patterns using driver context handles (`struct`) allowing easy management of multiple peripheral instances.
-* **GPIO & EXTI:** Atomic pin manipulation via `BSRR` register[cite: 4]. Supports custom runtime callback assignments globally mapped per physical pin index (0–15)[cite: 4].
-* **USART / UART:** Interrupt-driven transmission and reception backed by internal static lock-free circular ring buffers[cite: 3, 9]. Fully supports asynchronous formatted string streaming via an optimized `usart_printf()` wrapper[cite: 9].
-* **USART Advanced DMA:** Advanced `USART2` subsystem incorporating high-efficiency **DMA Receive with IDLE line detection**[cite: 9], enabling rapid variable-length packet parsing completely handled inside the background ISR context[cite: 9].
-* **I2C Master FSM:** Fully asynchronous, non-blocking master-mode driver controlled by an internal **Finite State Machine (FSM)** inside Event and Error ISR handlers[cite: 5]. Features automatic hardware recovery, NACK tracking, and automated multi-stage retries[cite: 5].
-* **SPI Interleaved Mode:** Non-blocking SPI engine operating in either standard IRQ or high-speed DMA modes[cite: 6]. Intelligently handles half/full-duplex switching under the hood by automatically mapping missing buffers to internal dummy elements to keep the serial clock scaling[cite: 6].
-* **ADC Pipeline:** Multichannel ADC conversion engine utilizing `DMA2` for automated, non-blocking streaming directly into RAM destination buffers with custom end-of-transfer user callbacks[cite: 1].
-* **DAC Wave Generator:** Automated digital wave generation via `DAC1 Channel 1` (PA4) synchronized directly to a basic timer update event trigger (`TRGO`) using direct `DMA1` routing[cite: 2].
-* **Timers & SysTick:** Modular timing subsystem splitting basic timers (`TIM6`/`TIM7`) for precise millisecond callbacks/delays[cite: 8] and general-purpose timers (`TIM2`/`TIM3`) for multichannel PWM output[cite: 8], supplemented by standard ARM Cortex-M `SysTick` timekeeping[cite: 7].
+* **GPIO & EXTI:** Atomic pin manipulation via `BSRR` register. Supports custom runtime callback assignments globally mapped per physical pin index (0–15).
+* **USART / UART:** Interrupt-driven transmission and reception backed by internal static lock-free circular ring buffers. Fully supports asynchronous formatted string streaming via an optimized `usart_printf()` wrapper.
+* **USART Advanced DMA:** Advanced `USART2` subsystem incorporating high-efficiency **DMA Receive with IDLE line detection**, enabling rapid variable-length packet parsing completely handled inside the background ISR context.
+* **I2C Master FSM:** Fully asynchronous, non-blocking master-mode driver controlled by an internal **Finite State Machine (FSM)** inside Event and Error ISR handlers. Features automatic hardware recovery, NACK tracking, and automated multi-stage retries.
+* **SPI Interleaved Mode:** Non-blocking SPI engine operating in either standard IRQ or high-speed DMA modes. Intelligently handles half/full-duplex switching under the hood by automatically mapping missing buffers to internal dummy elements to keep the serial clock scaling.
+* **ADC Pipeline:** Multichannel ADC conversion engine utilizing `DMA2` for automated, non-blocking streaming directly into RAM destination buffers with custom end-of-transfer user callbacks.
+* **DAC Wave Generator:** Automated digital wave generation via `DAC1 Channel 1` (PA4) synchronized directly to a basic timer update event trigger (`TRGO`) using direct `DMA1` routing.
+* **Timers & SysTick:** Modular timing subsystem splitting basic timers (`TIM6`/`TIM7`) for precise millisecond callbacks/delays and general-purpose timers (`TIM2`/`TIM3`) for multichannel PWM output, supplemented by standard ARM Cortex-M `SysTick` timekeeping.
 
 ---
 
@@ -80,7 +80,7 @@ int main(void) {
 
 ### USART with Circular DMA & IDLE Line Detection
 
-This advanced implementation sets up USART2 to stream incoming bytes directly into memory using a circular DMA pipeline[cite: 5]. The CPU remains completely asleep during transfers; it wakes up via the IDLE line interrupt only when a complete packet frame finishes arriving, triggering the asynchronous read_buff user callback[cite: 5].
+This advanced implementation sets up USART2 to stream incoming bytes directly into memory using a circular DMA pipeline. The CPU remains completely asleep during transfers; it wakes up via the IDLE line interrupt only when a complete packet frame finishes arriving, triggering the asynchronous read_buff user callback.
 
 ![logic analyzer example](images/usart.png)
 
@@ -147,7 +147,7 @@ int main(void) {
 
 ### Non-Blocking I2C Master (Finite State Machine)
 
-Instead of blocking execution loops waiting for hardware flags (SB, ADDR, TXE), this I2C driver executes via an interrupt-driven Finite State Machine (FSM)[cite: 5]. The example below demonstrates launching a complex multi-byte SSD1306 OLED initialization sequence asynchronously[cite: 5].
+Instead of blocking execution loops waiting for hardware flags (SB, ADDR, TXE), this I2C driver executes via an interrupt-driven Finite State Machine (FSM). The example below demonstrates launching a complex multi-byte SSD1306 OLED initialization sequence asynchronously.
 
 ![logic analyzer example](images/i2c.png)
 
@@ -248,7 +248,7 @@ int main(void) {
 
 ### High-Performance SPI with Auto-Dummy DMA
 
-Achieve absolute zero-CPU load SPI transactions. When reading or writing selectively, developers often struggle with managing missing transmission parameters. This driver evaluates NULL pointers automatically, shifting memory increment flags (MINC) off and routing missing buffers to standard internal static 0xFF elements to keep bus clock signals scaling dynamically[cite: 5].
+Achieve absolute zero-CPU load SPI transactions. When reading or writing selectively, developers often struggle with managing missing transmission parameters. This driver evaluates NULL pointers automatically, shifting memory increment flags (MINC) off and routing missing buffers to standard internal static 0xFF elements to keep bus clock signals scaling dynamically.
 
 ![logic analyzer example](images/spi_poweron.png)
 
@@ -423,11 +423,11 @@ int main(void) {
 
 A massive, high-throughput loopback demonstration configuration showcasing bare-metal performance:
 
-1. Basic Timer (TIM6) fires periodic update trigger outputs (TRGO) at precise millisecond bounds[cite: 5].
+1. Basic Timer (TIM6) fires periodic update trigger outputs (TRGO) at precise millisecond bounds.
 
-2. DAC1 Peripheral traps the hardware TRGO event natively, automatically offloading data frames from RAM out through DMA1 to produce precise analogue signal variants on pin PA4[cite: 2, 5].
+2. DAC1 Peripheral traps the hardware TRGO event natively, automatically offloading data frames from RAM out through DMA1 to produce precise analogue signal variants on pin PA4.
 
-3. ADC1 Peripheral monitors the target analogue output on pin PA0, updating memory buffers inside an automated continuous streaming loop directly handled by DMA2 interrupts[cite: 5].
+3. ADC1 Peripheral monitors the target analogue output on pin PA0, updating memory buffers inside an automated continuous streaming loop directly handled by DMA2 interrupts.
 
 ```C
 #include "main.h"
@@ -532,7 +532,7 @@ int main(void) {
 ## Requirements & Toolchain
 * Target Device: STM32F446xx (Nucleo-F446RE, etc.)
 * Toolchain: arm-none-eabi-gcc v10.x or newer
-* Required System Files: CMSIS Core device library register definition files (stm32f446xx.h, system_stm32f4xx.h) included in compiler include paths[cite: 5].
+* Required System Files: CMSIS Core device library register definition files (stm32f446xx.h, system_stm32f4xx.h) included in compiler include paths.
 
 
 ## License
