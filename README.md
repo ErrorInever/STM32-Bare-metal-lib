@@ -1,3 +1,7 @@
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Language: C](https://img.shields.io/badge/Language-C-blue.svg)](https://en.wikipedia.org/wiki/C_(programming_language))
+[![MCU: STM32F446](https://img.shields.io/badge/MCU-STM32F446xx-brightgreen.svg)](https://www.st.com/en/microcontrollers-microprocessors/stm32f446.html)
+
 # STM32F446 Bare-Metal Peripheral Library (CMSIS)
 
 A lightweight and easy-to-understand peripheral library written completely in **Bare-Metal C (CMSIS)** for the **STM32F446xx** microcontroller.
