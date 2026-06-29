@@ -121,6 +121,8 @@ void adc_init(adc_t *adc, adc_mode_t mode) {
     cr |= DMA_SxCR_CIRC;                                        // mode Circular
     cr |= DMA_SxCR_TCIE;                                        // enable interrupt Transmit complete
     cr |= DMA_SxCR_TEIE;                                        // enable interrupt Transport error
+    cr |= (1U << DMA_SxCR_MSIZE_Pos);
+    cr |= (1U << DMA_SxCR_PSIZE_Pos);
     adc->dma_stream->CR = cr;
 
     // ADC configure
