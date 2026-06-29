@@ -1,0 +1,95 @@
+#include "main.h"
+#include "ADC.h"
+#include "cmsis_gcc.h"
+#include "gpio.h"
+#include "stm32f446xx.h"
+#include "stm32f4xx_hal_gpio.h"
+#include "systick.h"
+#include "timer.h"
+#include <string.h>
+#include <usart.h>
+#include <stdint.h>
+#include "DAC.h"
+
+
+void SystemClock_Config(void);
+
+
+// buffer for ADC 1 channel
+uint16_t adc_res_buffer[1] = {0};
+uint16_t dac_wave[4] = {0, 1000, 2048, 4095}; // Signal for DAC
+
+// for live watch
+volatile uint16_t current_adc_value = 0;
+
+// channel for ADC (PA0 (channel 0))
+adc_channel_config_t adc_ch[] = {
+    { .channel_number = 0, .sampling_time = 3 }
+};
+
+// ADC test callback
+void my_adc_callback(adc_t *adc) {
+    current_adc_value = adc_res_buffer[0]; // Забираем то, что прочитал АЦП
+}
+
+int main(void) {
+  SystemClock_Config();
+  systick_config_ms(100);
+
+  static const gpio_t usart2_pa2 = {GPIOA, 2};
+  static const gpio_t usart2_pa3 = {GPIOA, 3};
+
+  gpio_init(&usart2_pa2, GPIO_MODE_AF_t, GPIO_PULL_UP_t, 
+    GPIO_OTYPE_PP_t, GPIO_SPEED_HIGH_t);
+  gpio_init(&usart2_pa3, GPIO_MODE_AF_t, GPIO_PULL_UP_t, 
+    GPIO_OTYPE_PP_t, GPIO_SPEED_HIGH_t);
+
+  gpio_set_alternate_function(&usart2_pa2, 7);
+  gpio_set_alternate_function(&usart2_pa3, 7);
+  
+  usart_t usart_2 = {
+    .instance = USART2,
+    .bus_freq = 25000000
+  };
+  //usart_init(&usart_2, 115200);
+  usart_init(&usart_2, 115200);
+
+  static const gpio_t adc_pa0 = {GPIOA, 0}; 
+  gpio_init(&adc_pa0, GPIO_MODE_ANALOG_t, GPIO_PULL_UP_t, 
+    GPIO_OTYPE_PP_t, GPIO_SPEED_HIGH_t);
+  
+
+  static const gpio_t dac_pa4 = {GPIOA, 4};
+  gpio_init(&dac_pa4, GPIO_MODE_ANALOG_t, GPIO_PULL_UP_t, 
+    GPIO_OTYPE_PP_t, GPIO_SPEED_HIGH_t);
+
+  timer_basic_t tim6 = {TIM6, 50};
+  timer_basic_init_ms(&tim6, 100);
+
+  // DAC
+  dac_t my_dac = {
+    .instance = DAC1,
+    .wave_buffer = dac_wave,
+    .num_points = 4
+  };
+  dac_init(&my_dac, &tim6);
+  dac_start(&my_dac);
+
+  // ADC
+  adc_t my_adc = {
+    .instance = ADC1,
+    .adc_channels = adc_ch,
+    .num_channels = 1,
+    .data_buffer = adc_res_buffer,
+    .callback = my_adc_callback
+  };
+  adc_init(&my_adc, CONTINUOUS);
+
+
+  while(1) {
+    __NOP();
+    usart_printf(&usart_2, "Raw number: %d\n", current_adc_value);
+    delay_ms(500);
+  }
+
+}
