@@ -41,7 +41,7 @@ int main(void) {
     .bus_freq = 25000000,
     .callback = read_buff
   };
-  //usart_init(&usart_2, 115200);
+
   usart2_rx_init_dma(&usart_2, 115200);
 
   // send
